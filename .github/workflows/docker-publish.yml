@@ -77,8 +77,8 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ steps.ver.outputs.version }}
-            type=raw,value=${{ steps.ver.outputs.major_minor }}
+            type=raw,value=v${{ steps.ver.outputs.version }}
+            type=raw,value=v${{ steps.ver.outputs.major_minor }}
             type=raw,value=latest
 
       - name: Build and push multi-arch image
