@@ -1,24 +1,24 @@
 # ProxySQL Admin UI
 
-A web interface for managing [ProxySQL](https://www.proxysql.com/) configuration, built with Blazor Server and .NET 8.
+一个用于管理 [ProxySQL](https://www.proxysql.com/) 配置的 Web 管理界面，基于 Blazor Server 和 .NET 8 构建。
 
-## Features
+## 功能
 
-- Dashboard and ProxySQL statistics
-- Add, edit, delete, and refresh `mysql_servers`
-- Add, edit, delete, and refresh `mysql_users`
-- Query rules configuration
-- Query digest statistics and filters
-- Global variables configuration
-- Automatic `LOAD ... TO RUNTIME` and `SAVE ... TO DISK` after server and user changes
-- Health endpoint at `/health`
+- 查看 ProxySQL 仪表盘和统计信息
+- 新增、编辑、删除和刷新 `mysql_servers`
+- 新增、编辑、删除和刷新 `mysql_users`
+- 配置查询规则
+- 查看查询摘要统计并进行筛选
+- 配置全局变量
+- 修改服务器和用户后自动执行 `LOAD ... TO RUNTIME` 与 `SAVE ... TO DISK`
+- 提供 `/health` 健康检查端点
 
 > [!WARNING]
-> This application can change live ProxySQL routing and authentication. Restrict access to the UI, use a dedicated ProxySQL Admin account, verify Runtime and Disk configuration before changes, and prepare rollback statements.
+> 本应用可以修改线上 ProxySQL 的路由和认证配置。生产环境请限制 Web 界面访问来源，使用专用 ProxySQL Admin 账号，在变更前核对 Runtime 和 Disk 配置，并准备回滚 SQL。
 
-## Quick start
+## 快速开始
 
-Run the image and point it at a ProxySQL Admin endpoint:
+启动镜像，并配置 ProxySQL Admin 连接：
 
 ```bash
 docker run -d --restart unless-stopped \
@@ -30,9 +30,9 @@ docker run -d --restart unless-stopped \
   amwpfiqvy/proxysql-admin-ui:latest
 ```
 
-Open `http://localhost:8001` after the container starts.
+启动后访问 `http://localhost:8001`。
 
-For a Docker Compose setup with ProxySQL on the same network:
+如果应用和 ProxySQL 位于同一个 Docker Compose 网络，可以使用服务名连接：
 
 ```yaml
 services:
@@ -49,25 +49,25 @@ services:
       PAI_DefaultUsers__0__Password: CHANGE_ME_TOO
 ```
 
-## Configuration
+## 配置项
 
-| Variable | Description |
+| 环境变量 | 说明 |
 |---|---|
-| `PAI_ConnectionStrings__ProxySqlContext` | ProxySQL Admin connection string |
-| `PAI_DefaultUsers__0__Username` | Initial Web UI administrator username |
-| `PAI_DefaultUsers__0__Password` | Initial Web UI administrator password |
-| `ASPNETCORE_URLS` | Listening URL; the image defaults to port `8001` |
+| `PAI_ConnectionStrings__ProxySqlContext` | ProxySQL Admin 连接字符串 |
+| `PAI_DefaultUsers__0__Username` | 首次创建的 Web 管理员用户名 |
+| `PAI_DefaultUsers__0__Password` | 首次创建的 Web 管理员密码 |
+| `ASPNETCORE_URLS` | Web 监听地址，镜像默认使用 `8001` 端口 |
 
-The Web UI identity database is stored in the application data directory. Mount a persistent volume at `/app/data` if you need to preserve users across container replacement.
+Web 管理员身份数据库存放在应用数据目录中。需要在替换容器后保留用户数据时，请将持久化卷挂载到 `/app/data`。
 
-## Supported architectures
+## 支持架构
 
-| Architecture | Status |
+| 架构 | 状态 |
 |---|---|
-| `linux/amd64` | Supported |
-| `linux/arm64` | Supported |
+| `linux/amd64` | 支持 |
+| `linux/arm64` | 支持 |
 
-## Links
+## 相关链接
 
-- Source: https://github.com/Apq/proxysql-admin-ui
-- License: MIT
+- 源码：https://github.com/Apq/proxysql-admin-ui
+- 许可证：MIT

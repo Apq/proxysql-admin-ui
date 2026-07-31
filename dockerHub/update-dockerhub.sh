@@ -54,10 +54,15 @@ overview_payload="$(jq -n \
   --arg description "$description" \
   --rawfile full_description "$SCRIPT_DIR/overview.md" \
   '{description: $description, full_description: $full_description}')"
-curl -fsS -X PATCH "$BASE_URL/" \
+http_code="$(curl -sS -o "$TMP_DIR/repository.json" -w '%{http_code}' -X PATCH "$BASE_URL/" \
   -H "Authorization: JWT $jwt" \
   -H 'Content-Type: application/json' \
-  -d "$overview_payload" > "$TMP_DIR/repository.json"
+  -d "$overview_payload")"
+if [[ "$http_code" != "200" ]]; then
+  echo "ERROR: Docker Hub description/overview update returned HTTP ${http_code}" >&2
+  cat "$TMP_DIR/repository.json" >&2
+  exit 1
+fi
 
 echo "Docker Hub description and overview updated for ${DH_NAMESPACE}/${DH_REPO}"
 
@@ -77,9 +82,14 @@ if [[ -z "$category_payload" ]]; then
   exit 1
 fi
 
-curl -fsS -X PATCH "${BASE_URL}/categories/" \
+http_code="$(curl -sS -o "$TMP_DIR/category.json" -w '%{http_code}' -X PATCH "${BASE_URL}/categories/" \
   -H "Authorization: JWT $jwt" \
   -H 'Content-Type: application/json' \
-  -d "$category_payload" > "$TMP_DIR/category.json"
+  -d "$category_payload")"
+if [[ "$http_code" != "200" ]]; then
+  echo "ERROR: Docker Hub category update returned HTTP ${http_code}" >&2
+  cat "$TMP_DIR/category.json" >&2
+  exit 1
+fi
 
 echo "Docker Hub category updated to ${category}"

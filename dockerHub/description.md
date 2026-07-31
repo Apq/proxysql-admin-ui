@@ -1,1 +1,1 @@
-Multi-architecture ProxySQL Admin UI for managing MySQL servers, users, query rules, variables, runtime state, and disk persistence.
+用于管理 ProxySQL 后端服务器、用户、查询规则和运行时配置的多架构 Web 管理界面
