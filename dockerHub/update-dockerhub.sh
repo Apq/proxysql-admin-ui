@@ -28,8 +28,9 @@ done
 description="$(tr -d '\r\n' < "$SCRIPT_DIR/description.md")"
 category="$(tr -d '\r\n' < "$SCRIPT_DIR/category.txt" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
-if [[ -z "$description" || "${#description}" -gt 140 ]]; then
-  echo "ERROR: description.md must contain 1-140 characters" >&2
+description_bytes="$(printf '%s' "$description" | wc -c | tr -d ' ')"
+if [[ -z "$description" || "$description_bytes" -gt 100 ]]; then
+  echo "ERROR: description.md must contain 1-100 UTF-8 bytes (actual: ${description_bytes})" >&2
   exit 1
 fi
 if [[ -z "$category" ]]; then
