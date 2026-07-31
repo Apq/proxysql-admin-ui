@@ -1,4 +1,7 @@
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/dotfinity/proxysql-admin-ui/docker-container-publish.yml)
+![Docker Image Version](https://img.shields.io/docker/v/amwpfiqvy/proxysql-admin-ui?sort=semver)
+![Docker Pulls](https://img.shields.io/docker/pulls/amwpfiqvy/proxysql-admin-ui)
+![Docker Image Size](https://img.shields.io/docker/image-size/amwpfiqvy/proxysql-admin-ui/latest)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Apq/proxysql-admin-ui/docker-publish.yml?branch=apqmain)
 
 ----
 
@@ -58,7 +61,7 @@ A modern web interface for managing ProxySQL, built with Blazor and .NET Core.
 
 ```json
 "ConnectionStrings": {
-    "ProxySqlContext": "Server=0.0.0.0;Port=6033;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;"
+    "ProxySqlContext": "Server=0.0.0.0;Port=6032;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;"
   },
   "DefaultUsers": [
     {
@@ -85,19 +88,19 @@ Set the environment variables in the `docker-compose.yml` file:
 ```yml
 environment:
   ASPNETCORE_ENVIRONMENT: Production
-  ASPNETCORE_URLS: 'http://+:8000'
-  # Connection string for the ProxySQL server
-  PAI_ConnectionStrings__ProxySqlContext: 'Server=xxxxxx;Port=6033;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;'
+  ASPNETCORE_URLS: 'http://+:8001'
+  # Connection string for the ProxySQL Admin server
+  PAI_ConnectionStrings__ProxySqlContext: 'Server=xxxxxx;Port=6032;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;'
 ```
 
-or if you're running the app and the proxysql server in the same docker-compose file, you can use the service name as the host:
+or if you're running the app and the ProxySQL server in the same docker-compose file, you can use the service name as the host:
 
 ```yml
 environment:
   ASPNETCORE_ENVIRONMENT: Production
-  ASPNETCORE_URLS: 'http://+:8000'
-  # Connection string for the ProxySQL server
-  PAI_ConnectionStrings__ProxySqlContext: 'Server=proxysql;Port=6033;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;'
+  ASPNETCORE_URLS: 'http://+:8001'
+  # Connection string for the ProxySQL Admin server
+  PAI_ConnectionStrings__ProxySqlContext: 'Server=proxysql;Port=6032;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;'
 ```
 
 ## Random notes

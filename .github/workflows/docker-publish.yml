@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: dockerhub
     permissions:
-      contents: write
+      contents: read
       packages: write
     steps:
       - name: Checkout
@@ -44,21 +44,32 @@ jobs:
 
       - name: Compute version
         id: ver
+        shell: bash
         run: |
+          set -euo pipefail
           if [ "${{ github.event_name }}" = "push" ]; then
-            # tag push: refs/tags/v1.0
             TAG="${GITHUB_REF#refs/tags/v}"
+            if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+$ ]]; then
+              echo "Unsupported tag format: v${TAG}; expected v<major>.<minor>"
+              exit 1
+            fi
             MAJOR=$(echo "$TAG" | cut -d. -f1)
             MINOR=$(echo "$TAG" | cut -d. -f2)
           else
             MAJOR="${{ inputs.version_major }}"
             MINOR="${{ inputs.version_minor }}"
+            if [[ ! "$MAJOR" =~ ^[0-9]+$ || ! "$MINOR" =~ ^[0-9]+$ ]]; then
+              echo "Version inputs must be numeric"
+              exit 1
+            fi
           fi
-          # Auto-suffix: .YYYYMMDD.HHMM (4 segments total)
+
+          # Four segments: major.minor.YYYYMMDD.HHMM, Asia/Shanghai time.
           STAMP=$(TZ=Asia/Shanghai date +'%Y%m%d.%H%M')
           VERSION="${MAJOR}.${MINOR}.${STAMP}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "major_minor=${MAJOR}.${MINOR}" >> "$GITHUB_OUTPUT"
+          echo "Building ${IMAGE_NAME}:${VERSION}"
 
       - name: Docker meta
         id: meta
@@ -84,8 +95,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Create git tag (workflow_dispatch only)
-        if: github.event_name == 'workflow_dispatch' && steps.docker_build.outcome == 'success'
-        run: |
-          git tag "v${{ steps.ver.outputs.major_minor }}"-${{ github.run_number }}
-          git push origin "v${{ steps.ver.outputs.major_minor }}-${{ github.run_number }}"
+      - name: Update Docker Hub repository metadata
+        if: steps.docker_build.outcome == 'success'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+          DOCKERHUB_NAMESPACE: amwpfiqvy
+          DOCKERHUB_REPOSITORY: proxysql-admin-ui
+        run: bash ./dockerHub/update-dockerhub.sh
