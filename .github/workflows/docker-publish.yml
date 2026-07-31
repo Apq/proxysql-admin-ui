@@ -53,8 +53,8 @@ jobs:
             MAJOR="${{ inputs.version_major }}"
             MINOR="${{ inputs.version_minor }}"
           fi
-          # Auto-suffix: .YYYY.MMDD.HHMM
-          STAMP=$(TZ=UTC date +'%Y.%m%d.%H%M')
+          # Auto-suffix: .YYYYMMDD.HHMM (4 segments total)
+          STAMP=$(TZ=Asia/Shanghai date +'%Y%m%d.%H%M')
           VERSION="${MAJOR}.${MINOR}.${STAMP}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "major_minor=${MAJOR}.${MINOR}" >> "$GITHUB_OUTPUT"
