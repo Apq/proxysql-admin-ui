@@ -34,7 +34,7 @@ RUN dotnet publish "./ProxysqlAdminUi.Web.csproj" \
       -c "$BUILD_CONFIGURATION" \
       -o /app/publish \
       /p:UseAppHost=true \
-      /p:Version="$APP_VERSION"
+      /p:InformationalVersion="$APP_VERSION"
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine
