@@ -16,30 +16,30 @@ public class StatsMysqlQueryDigestModel
     [Column("schemaname", Order = 1)]
     [Required]
     [MaxLength(255)]
-    public string Schemaname { get; set; }
+    public string Schemaname { get; set; } = string.Empty;
 
 
     [Column("username", Order = 2)]
     [Required]
     [MaxLength(255)]
-    public string Username { get; set; }
+    public string Username { get; set; } = string.Empty;
 
 
     [Column("client_address", Order = 3)]
     [Required]
     [MaxLength(255)]
-    public string ClientAddress { get; set; }
+    public string ClientAddress { get; set; } = string.Empty;
 
 
     [Column("digest", Order = 4)]
     [Required]
     [MaxLength(255)]
-    public string Digest { get; set; }
+    public string Digest { get; set; } = string.Empty;
 
     [Column("digest_text")]
     [Required]
     [MaxLength(255)]
-    public string DigestText { get; set; }
+    public string DigestText { get; set; } = string.Empty;
 
     [Column("count_star")]
     [Required]

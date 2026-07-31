@@ -17,8 +17,9 @@
 <RadzenCard>
     <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H1">MySQL Query Digest Statistics</RadzenText>
 
-    <RadzenDataGrid @ref="_grid"
-                    Visible="@_gridVisible"
+    <RadzenDataGrid Visible="@_gridVisible"
+                    Settings="@_gridSettings"
+                    SettingsChanged="OnSettingsChanged"
                     AllowColumnPicking="true"
                     AllowColumnReorder="true"
                     AllowColumnResize="true"
@@ -34,7 +35,6 @@
                     PageSize="300"
                     ShowColumnTitleAsTooltip="true"
                     TItem="QueryDigestViewModel"
-                    PickedColumnsChanged="OnColumnUpdated"
                     >
         <EmptyTemplate>
             <RadzenText TagName="TagName.H3" Text="No data to display" />
@@ -141,10 +141,14 @@
                             </ChildContent>
                         </RadzenSplitButton>
                     }
-                    else
+                    else if (digest.RuleId is int ruleId)
                     {
                         <RadzenButton ButtonStyle="ButtonStyle.Primary" Icon="edit" Text="Edit Rule" Size="ButtonSize.Small"
-                                      Click="async ()=> await EditRule(digest.RuleId.Value)" />
+                                      Click="async ()=> await EditRule(ruleId)" />
+                    }
+                    else
+                    {
+                        <RadzenText Text="The associated rule is unavailable." />
                     }
                 </Template>
             </RadzenDataGridColumn>
@@ -155,12 +159,32 @@
 
 @code {
     
-    private RadzenDataGrid<QueryDigestViewModel> _grid;
-    private const string COLUMN_SETTINGS_KEY = "queryDigestColumns";
-    private bool _gridVisible = false;
-    private IEnumerable<QueryDigestViewModel> _queryDigests = new List<QueryDigestViewModel>();
+    private const string ColumnSettingsKey = "queryDigestColumns";
+    private bool _gridVisible;
+    private IEnumerable<QueryDigestViewModel> _queryDigests = [];
+    private DataGridSettings? _gridSettings;
     
-    private static readonly List<string> _defaultColumnsVisible =
+    private static readonly string[] GridColumnProperties =
+    [
+        nameof(QueryDigestViewModel.Hostgroup),
+        nameof(QueryDigestViewModel.Schemaname),
+        nameof(QueryDigestViewModel.Username),
+        nameof(QueryDigestViewModel.ClientAddress),
+        nameof(QueryDigestViewModel.Digest),
+        nameof(QueryDigestViewModel.DigestText),
+        nameof(QueryDigestViewModel.CountStar),
+        nameof(QueryDigestViewModel.CacheHits),
+        nameof(QueryDigestViewModel.FirstSeen),
+        nameof(QueryDigestViewModel.LastSeen),
+        nameof(QueryDigestViewModel.SumTime),
+        nameof(QueryDigestViewModel.MinTime),
+        nameof(QueryDigestViewModel.MaxTime),
+        nameof(QueryDigestViewModel.SumRowsAffected),
+        nameof(QueryDigestViewModel.SumRowsSent),
+        nameof(QueryDigestViewModel.RuleId)
+    ];
+
+    private static readonly HashSet<string> DefaultVisibleColumns =
     [
         nameof(QueryDigestViewModel.Hostgroup),
         nameof(QueryDigestViewModel.Digest),
@@ -191,7 +215,7 @@
     private async Task EditRule(int ruleId)
     {
         await DialogService.OpenAsync<EditQueryRuleDialog>("Edit Rule",
-        new Dictionary<string, object> { { "RuleId", ruleId } });
+        new Dictionary<string, object?> { { "RuleId", ruleId } });
 
         // Refresh data after edit
         await RefreshData();
@@ -200,7 +224,7 @@
     private async Task CreateRule(QueryDigestViewModel  digest, RadzenSplitButtonItem args)
     {
         await DialogService.OpenAsync<AddQueryRuleDialog>("Create Rule From Digest",
-        new Dictionary<string, object>
+        new Dictionary<string, object?>
                   {
                       { "DigestParam", digest.Digest },
                       { "Minutes", int.Parse(args?.Value ?? "0")},
@@ -220,7 +244,7 @@
     private async Task ClikShowQueryDialog(string digestText)
     {
         await DialogService.OpenAsync<QueryDigestTextDialog>("Query",
-        new Dictionary<string, object> { { "DigestText", digestText } },
+        new Dictionary<string, object?> { { "DigestText", digestText } },
         new DialogOptions()
             {
                 Resizable = true,
@@ -235,42 +259,50 @@
         StateHasChanged();
     }
     
-    private async Task OnColumnUpdated(DataGridPickedColumnsChangedEventArgs<QueryDigestViewModel> changedEventArgs)
+    private async Task OnSettingsChanged(DataGridSettings settings)
     {
-        if (_grid == null) return;
-        
-        // Radzen sends the list of selected columns and their visibility
-        // but a just picked column is not yet visible, so we should not filter on visibility.
-        var visibleColumns = changedEventArgs.Columns 
-            .Select(c => c.Property)
-            .ToList();
-        
-        var settings = JsonSerializer.Serialize(visibleColumns);
-        await JSRuntime.InvokeVoidAsync("localStorage.setItem", COLUMN_SETTINGS_KEY, settings);
+        _gridSettings = settings;
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", ColumnSettingsKey, JsonSerializer.Serialize(settings));
     }
     
     private async Task LoadColumnSettings()
     {
-        if (_grid == null) return;
-
-        var visibleColumns = _defaultColumnsVisible;
-        
-        var settings = await JSRuntime.InvokeAsync<string>("localStorage.getItem", COLUMN_SETTINGS_KEY);
-        
-        if (!string.IsNullOrEmpty(settings))
-        { 
-            visibleColumns = JsonSerializer.Deserialize<List<string>>(settings);
-        }
-        
-        foreach (var column in _grid.ColumnsCollection)
-        {
-            // if the proprty "Visible" is set in the "html" part,
-            // then this has no effect on the column visibility.
-            var isContained = visibleColumns.Contains(column.Property);
-            column.Visible = isContained;
-        }
+        var savedSettings = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", ColumnSettingsKey);
+        _gridSettings = RestoreGridSettings(savedSettings);
 
         _gridVisible = true;
         StateHasChanged();
+    }
+
+    private static DataGridSettings RestoreGridSettings(string? savedSettings)
+    {
+        if (string.IsNullOrWhiteSpace(savedSettings))
+        {
+            return CreateGridSettings(DefaultVisibleColumns);
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<DataGridSettings>(savedSettings)
+                ?? CreateGridSettings(DefaultVisibleColumns);
+        }
+        catch (JsonException)
+        {
+            return CreateGridSettings(DefaultVisibleColumns);
+        }
+    }
+
+    private static DataGridSettings CreateGridSettings(IEnumerable<string> visibleColumns)
+    {
+        var visibleColumnSet = visibleColumns.ToHashSet(StringComparer.Ordinal);
+        return new DataGridSettings
+        {
+            Columns = GridColumnProperties.Select((property, index) => new DataGridColumnSettings
+            {
+                Property = property,
+                Visible = visibleColumnSet.Contains(property),
+                OrderIndex = index
+            }).ToList()
+        };
     }
 }

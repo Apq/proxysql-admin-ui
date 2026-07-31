@@ -82,7 +82,7 @@ var app = builder.Build();
 
 var scope = app.Services.CreateAsyncScope();
 
-await scope.ServiceProvider.GetService<DefaultUserSeedService>().SeedDefaultUsersAsync();
+await scope.ServiceProvider.GetRequiredService<DefaultUserSeedService>().SeedDefaultUsersAsync();
 
 if (!app.Environment.IsDevelopment())
 {

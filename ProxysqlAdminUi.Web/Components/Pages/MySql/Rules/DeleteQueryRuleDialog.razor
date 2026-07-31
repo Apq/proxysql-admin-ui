@@ -62,14 +62,14 @@
     [Parameter]
     public int RuleId { get; set; }
 
-    private MysqlQueryRuleModel queryRule;
-    private bool isLoading = true;
+    private MysqlQueryRuleModel? queryRule;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            queryRule = await ProxySqlRepository.GetMySqlQueryRule(RuleId);
+            queryRule = await ProxySqlRepository.GetMySqlQueryRule(RuleId)
+                ?? throw new InvalidOperationException("The selected query rule was not found.");
         }
         catch (Exception ex)
         { 
@@ -79,7 +79,6 @@
         }
         finally
         {
-            isLoading = false;
         }
     }
 

@@ -293,13 +293,14 @@
     [Parameter]
     public int RuleId { get; set; }
 
-    private MysqlQueryRuleModel _queryRule;
+    private MysqlQueryRuleModel? _queryRule;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            _queryRule = await ProxySqlRepository.GetMySqlQueryRule(RuleId);
+            _queryRule = await ProxySqlRepository.GetMySqlQueryRule(RuleId)
+                ?? throw new InvalidOperationException("The selected query rule was not found.");
         }
         catch (Exception ex)
         {
@@ -312,7 +313,8 @@
     {
         try
         {
-            await ProxySqlRepository.UpdateMySqlQueryRule(_queryRule);
+            await ProxySqlRepository.UpdateMySqlQueryRule(
+                _queryRule ?? throw new InvalidOperationException("The selected query rule was not found."));
             NotificationService.Notify(NotificationSeverity.Success, "Success", "Query rule updated successfully");
             DialogService.Close(true);
         }

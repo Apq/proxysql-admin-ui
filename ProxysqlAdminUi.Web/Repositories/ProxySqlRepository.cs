@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Data;
+using Microsoft.EntityFrameworkCore;
 using ProxysqlAdminUi.Web.Contexts;
 using ProxysqlAdminUi.Web.Models;
 using ProxysqlAdminUi.Web.ViewModel;
@@ -224,16 +225,17 @@ GROUP BY r.rule_id, r.active, r.username, r.schemaname, r.flagIN, r.client_addr,
              {32}, {33})";
 
         var result = await context.Database.ExecuteSqlRawAsync(sql,
-            rule.Active, rule.Username, rule.Schemaname, rule.FlagIn,
-            rule.ClientAddr, rule.ProxyAddr, rule.ProxyPort, rule.Digest,
-            rule.MatchDigest, rule.MatchPattern, rule.NegateMatchPattern,
-            rule.ReModifiers, rule.FlagOut, rule.ReplacePattern,
-            rule.DestinationHostgroup, rule.CacheTtl, rule.CacheEmptyResult,
-            rule.CacheTimeout, rule.Reconnect, rule.Timeout, rule.Retries,
-            rule.Delay, rule.NextQueryFlagIn, rule.MirrorFlagOut,
-            rule.MirrorHostgroup, rule.ErrorMsg, rule.OKMsg, rule.StickyConn,
-            rule.Multiplex, rule.GtidFromHostgroup, rule.Log, rule.Apply,
-            rule.Attributes, rule.Comment);
+            ToDbValues(
+                rule.Active, rule.Username, rule.Schemaname, rule.FlagIn,
+                rule.ClientAddr, rule.ProxyAddr, rule.ProxyPort, rule.Digest,
+                rule.MatchDigest, rule.MatchPattern, rule.NegateMatchPattern,
+                rule.ReModifiers, rule.FlagOut, rule.ReplacePattern,
+                rule.DestinationHostgroup, rule.CacheTtl, rule.CacheEmptyResult,
+                rule.CacheTimeout, rule.Reconnect, rule.Timeout, rule.Retries,
+                rule.Delay, rule.NextQueryFlagIn, rule.MirrorFlagOut,
+                rule.MirrorHostgroup, rule.ErrorMsg, rule.OKMsg, rule.StickyConn,
+                rule.Multiplex, rule.GtidFromHostgroup, rule.Log, rule.Apply,
+                rule.Attributes, rule.Comment));
 
         await ApplyMySqlQueryRulesAsync(context);
         return result;
@@ -258,17 +260,18 @@ GROUP BY r.rule_id, r.active, r.username, r.schemaname, r.flagIN, r.client_addr,
             WHERE rule_id = {0}";
 
         var result = await context.Database.ExecuteSqlRawAsync(sql,
-            rule.RuleId, rule.Active, rule.Username, rule.Schemaname,
-            rule.FlagIn, rule.ClientAddr, rule.ProxyAddr, rule.ProxyPort,
-            rule.Digest, rule.MatchDigest, rule.MatchPattern,
-            rule.NegateMatchPattern, rule.ReModifiers, rule.FlagOut,
-            rule.ReplacePattern, rule.DestinationHostgroup, rule.CacheTtl,
-            rule.CacheEmptyResult, rule.CacheTimeout, rule.Reconnect,
-            rule.Timeout, rule.Retries, rule.Delay, rule.NextQueryFlagIn,
-            rule.MirrorFlagOut, rule.MirrorHostgroup, rule.ErrorMsg,
-            rule.OKMsg, rule.StickyConn, rule.Multiplex,
-            rule.GtidFromHostgroup, rule.Log, rule.Apply,
-            rule.Attributes, rule.Comment);
+            ToDbValues(
+                rule.RuleId, rule.Active, rule.Username, rule.Schemaname,
+                rule.FlagIn, rule.ClientAddr, rule.ProxyAddr, rule.ProxyPort,
+                rule.Digest, rule.MatchDigest, rule.MatchPattern,
+                rule.NegateMatchPattern, rule.ReModifiers, rule.FlagOut,
+                rule.ReplacePattern, rule.DestinationHostgroup, rule.CacheTtl,
+                rule.CacheEmptyResult, rule.CacheTimeout, rule.Reconnect,
+                rule.Timeout, rule.Retries, rule.Delay, rule.NextQueryFlagIn,
+                rule.MirrorFlagOut, rule.MirrorHostgroup, rule.ErrorMsg,
+                rule.OKMsg, rule.StickyConn, rule.Multiplex,
+                rule.GtidFromHostgroup, rule.Log, rule.Apply,
+                rule.Attributes, rule.Comment));
 
         await ApplyMySqlQueryRulesAsync(context);
         return result;
@@ -416,6 +419,11 @@ GROUP BY r.rule_id, r.active, r.username, r.schemaname, r.flagIN, r.client_addr,
     {
         await context.Database.ExecuteSqlRawAsync("LOAD MYSQL QUERY RULES TO RUNTIME;");
         await context.Database.ExecuteSqlRawAsync("SAVE MYSQL QUERY RULES TO DISK;");
+    }
+
+    private static object[] ToDbValues(params object?[] values)
+    {
+        return values.Select(static value => value ?? DBNull.Value).ToArray();
     }
 
     private static void EnsureRowChanged(int affectedRows, string message)

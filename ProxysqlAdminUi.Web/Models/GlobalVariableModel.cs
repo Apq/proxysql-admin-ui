@@ -10,10 +10,10 @@ public class GlobalVariableModel
     [Column("variable_name")]
     [Required]
     [MaxLength(255)]
-    public string VariableName { get; set; }
+    public string VariableName { get; set; } = string.Empty;
 
     [Column("variable_value")]
     [Required]
     [MaxLength(255)]
-    public string VariableValue { get; set; }
+    public string VariableValue { get; set; } = string.Empty;
 }

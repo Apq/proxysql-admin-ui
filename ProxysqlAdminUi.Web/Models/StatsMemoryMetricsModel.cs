@@ -8,7 +8,7 @@ public class StatsMemoryMetricsModel
 {
     [Key]
     [Column("Variable_Name")]
-    public string VariableName { get; set; }
+    public string VariableName { get; set; } = string.Empty;
 
     [Column("Variable_Value")]
     public long VariableValue { get; set; }

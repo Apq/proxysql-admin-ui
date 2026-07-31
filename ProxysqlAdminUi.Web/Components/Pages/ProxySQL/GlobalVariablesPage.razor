@@ -50,8 +50,8 @@
 </RadzenStack>
 
 @code {
-    private IEnumerable<GlobalVariableModel> _variables;
-    private RadzenDataGrid<GlobalVariableModel> variablesGrid;
+    private IEnumerable<GlobalVariableModel> _variables = [];
+    private RadzenDataGrid<GlobalVariableModel>? variablesGrid;
     private Dictionary<string, string> _originalValues = new();
 
     protected override async Task OnInitializedAsync()
@@ -67,14 +67,17 @@
     async Task EditRow(GlobalVariableModel variable)
     {
         _originalValues[variable.VariableName] = variable.VariableValue;
-        await variablesGrid.EditRow(variable);
+        if (variablesGrid is not null)
+        {
+            await variablesGrid.EditRow(variable);
+        }
     }
 
-    void OnUpdateRow(GlobalVariableModel variable)
+    async Task OnUpdateRow(GlobalVariableModel variable)
     {
         try
         {
-            ProxySqlRepository.UpdateGlobalVariable(variable);
+            await ProxySqlRepository.UpdateGlobalVariable(variable);
             NotificationService.Notify(NotificationSeverity.Success, "Success", "Variable updated");
             _originalValues.Remove(variable.VariableName);
         }
@@ -91,7 +94,10 @@
 
     async Task SaveRow(GlobalVariableModel variable)
     {
-        await variablesGrid.UpdateRow(variable);
+        if (variablesGrid is not null)
+        {
+            await variablesGrid.UpdateRow(variable);
+        }
     }
 
     void CancelEdit(GlobalVariableModel variable)
@@ -101,6 +107,6 @@
             variable.VariableValue = _originalValues[variable.VariableName];
             _originalValues.Remove(variable.VariableName);
         }
-        variablesGrid.CancelEditRow(variable);
+        variablesGrid?.CancelEditRow(variable);
     }
 }

@@ -4,4 +4,4 @@ $ScriptDir = $PSScriptRoot
 Assert-Administrator
 $WinswExe = Get-WinSwExecutable -ScriptDir $ScriptDir
 Start-ManagedService -WinswExe $WinswExe
-Write-Host "ProxySQL Admin UI is ready: http://localhost:8000"
+Write-Host "ProxySQL Admin UI is ready: http://localhost:8001"

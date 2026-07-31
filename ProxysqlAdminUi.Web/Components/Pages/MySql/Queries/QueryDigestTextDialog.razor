@@ -10,7 +10,7 @@
 </RadzenStack>
 
 @code {
-    [Parameter] public string DigestText { get; set; }
+    [Parameter] public string DigestText { get; set; } = string.Empty;
     [Parameter] public bool ShowClose { get; set; } = true;
      
     protected override async Task OnParametersSetAsync()

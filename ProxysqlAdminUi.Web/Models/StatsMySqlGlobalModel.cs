@@ -8,8 +8,8 @@ public class StatsMySqlGlobalModel
 {
     [Key]
     [Column("Variable_Name")]
-    public string VariableName { get; set; }
+    public string VariableName { get; set; } = string.Empty;
 
     [Column("Variable_Value")]
-    public string VariableValue { get; set; }
+    public string VariableValue { get; set; } = string.Empty;
 }

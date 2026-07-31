@@ -7,7 +7,7 @@
   <workingdirectory>%BASE%\..\..\publish</workingdirectory>
 
   <env name="ASPNETCORE_ENVIRONMENT" value="Production"/>
-  <env name="ASPNETCORE_URLS" value="http://0.0.0.0:8000"/>
+  <env name="ASPNETCORE_URLS" value="http://0.0.0.0:8001"/>
   <env name="APP_DB_PATH" value="%BASE%\..\..\data"/>
   <env name="PAI_ConnectionStrings__ProxySqlContext" value="$(PROXYSQL_CONNECTION_STRING)"/>
   <env name="PAI_DefaultUsers__0__Username" value="admin"/>

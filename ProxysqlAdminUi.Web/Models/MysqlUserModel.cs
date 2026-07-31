@@ -12,11 +12,11 @@ public class MysqlUserModel
     [Column("username", Order = 0)]
     [Required]
     [MaxLength(255)]
-    public string Username { get; set; }
+    public string Username { get; set; } = string.Empty;
 
     [Column("password")]
     [MaxLength(255)]
-    public string Password { get; set; }
+    public string Password { get; set; } = string.Empty;
 
     [Column("active")]
     [Range(0, 1)]
@@ -31,7 +31,7 @@ public class MysqlUserModel
 
     [Column("default_schema")]
     [MaxLength(255)]
-    public string DefaultSchema { get; set; }
+    public string DefaultSchema { get; set; } = string.Empty;
 
     [Column("schema_locked")]
     [Range(0, 1)]

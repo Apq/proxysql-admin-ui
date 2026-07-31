@@ -18,7 +18,7 @@ public class MysqlServerModel
     [Column("hostname", Order = 1)]
     [Required]
     [MaxLength(255)]
-    public string Hostname { get; set; }
+    public string Hostname { get; set; } = string.Empty;
 
 
     [Column("port", Order = 2)]

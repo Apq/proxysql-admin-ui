@@ -129,5 +129,5 @@ if (-not $serviceWasInstalled) {
 Start-ManagedService -WinswExe $WinswExe
 
 Write-Host "Deployment completed."
-Write-Host "URL: http://localhost:8000"
+Write-Host "URL: http://localhost:8001"
 Write-Host "Persistent identity data: $DataDir"

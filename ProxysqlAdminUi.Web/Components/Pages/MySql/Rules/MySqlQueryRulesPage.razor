@@ -157,6 +157,11 @@
     {
         var rule = MysqlQueryRulesList.Find(x => x.RuleId == ruleId);
 
+        if (rule is null)
+        {
+            return [];
+        }
+
         return
         [
             new () { Type = "Processed", Count = rule.CountStar  },
@@ -177,7 +182,7 @@
     private async Task ShowEditModal(int ruleId)
     {
         await DialogService.OpenAsync<EditQueryRuleDialog>("Edit Rule " + ruleId,
-            parameters: new Dictionary<string, object>() { { "RuleId", ruleId } },
+            parameters: new Dictionary<string, object?>() { { "RuleId", ruleId } },
             options: new DialogOptions() { CloseDialogOnEsc = true });
 
         // Refresh the rules list after edit
@@ -188,7 +193,7 @@
     private async Task ShowDeleteModal(int ruleId)
     {
         await DialogService.OpenAsync<DeleteQueryRuleDialog>("Delete Rule " + ruleId,
-            parameters: new Dictionary<string, object>() { { "RuleId", ruleId } },
+            parameters: new Dictionary<string, object?>() { { "RuleId", ruleId } },
             options: new DialogOptions()
                 {
                     CloseDialogOnEsc = true

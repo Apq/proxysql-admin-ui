@@ -14,7 +14,7 @@ public class StatsMySqlQueryRuleModel
     [Required]
     public int Hits { get; set; }
 
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         if (obj == null || GetType() != obj.GetType())
             return false;

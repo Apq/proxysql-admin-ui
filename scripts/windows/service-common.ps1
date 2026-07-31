@@ -6,7 +6,7 @@
 $ServiceName = "ProxySQL-Admin-UI"
 $ServiceWaitTimeoutSeconds = 90
 $ServicePollMilliseconds = 500
-$ServiceHealthUrl = "http://127.0.0.1:8000/health"
+$ServiceHealthUrl = "http://127.0.0.1:8001/health"
 $WinSwVersion = "2.12.0"
 $WinSwSha256 = "05B82D46AD331CC16BDC00DE5C6332C1EF818DF8CEEFCD49C726553209B3A0DA"
 

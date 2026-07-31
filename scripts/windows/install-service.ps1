@@ -32,5 +32,5 @@ Write-Host "Service installed."
 
 if (-not $NoStart) {
     Start-ManagedService -WinswExe $WinswExe
-    Write-Host "Service started: http://localhost:8000"
+    Write-Host "Service started: http://localhost:8001"
 }
