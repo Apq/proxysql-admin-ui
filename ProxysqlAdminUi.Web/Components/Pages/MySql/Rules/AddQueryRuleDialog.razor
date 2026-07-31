@@ -9,6 +9,7 @@
 @inject ProxySqlRepository ProxySqlRepository
 @inject DialogService DialogService
 @inject NotificationService NotificationService
+@inject LocalizationService L
 
 <RadzenContent Container="main">
     <RadzenStack Gap="1rem">
@@ -22,13 +23,13 @@
                             <RadzenColumn Size="6">
                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                                     <RadzenCheckBox @bind-Value=@_queryRule.Active Name="@nameof(MysqlQueryRuleModel.Active)" />
-                                    <RadzenLabel Text="Active" Component="@nameof(MysqlQueryRuleModel.Active)" />
+                                    <RadzenLabel Text='@L["Active"]' Component="@nameof(MysqlQueryRuleModel.Active)" />
                                 </RadzenStack>
                             </RadzenColumn>
                             <RadzenColumn Size="6">
                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                                     <RadzenCheckBox @bind-Value=@_queryRule.Apply Name="@nameof(MysqlQueryRuleModel.Apply)" />
-                                    <RadzenLabel Text="Apply" Component="@nameof(MysqlQueryRuleModel.Apply)" />
+                                    <RadzenLabel Text='@L["Apply"]' Component="@nameof(MysqlQueryRuleModel.Apply)" />
                                 </RadzenStack>
                             </RadzenColumn>
                         </RadzenRow>
@@ -36,7 +37,7 @@
                         <RadzenRow>
                             <RadzenColumn Size="12">
                                 <RadzenStack>
-                                    <RadzenLabel Text="Match Pattern" />
+                                    <RadzenLabel Text='@L["Match Pattern"]' />
                                     <RadzenTextArea @bind-Value=@_queryRule.MatchPattern Name="@nameof(MysqlQueryRuleModel.MatchPattern)" />
                                 </RadzenStack>
                             </RadzenColumn>
@@ -45,7 +46,7 @@
                         <RadzenRow>
                             <RadzenColumn Size="12">
                                 <RadzenStack>
-                                    <RadzenLabel Text="Match Digest" />
+                                    <RadzenLabel Text='@L["Match Digest"]' />
                                     <RadzenTextBox @bind-Value=@_queryRule.MatchDigest Name="@nameof(MysqlQueryRuleModel.MatchDigest)" />
                                 </RadzenStack>
                             </RadzenColumn>
@@ -54,14 +55,14 @@
                         <RadzenRow>
                             <RadzenColumn Size="12">
                                 <RadzenStack>
-                                    <RadzenLabel Text="Cache TTL" />
+                                    <RadzenLabel Text='@L["Cache TTL"]' />
                                     <TimeInput @bind-Value="_queryRule.CacheTtl" />
                                 </RadzenStack>
                             </RadzenColumn>
                             <RadzenColumn Size="6">
                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                                     <RadzenCheckBox @bind-Value=@_queryRule.CacheEmptyResult Name="@nameof(MysqlQueryRuleModel.CacheEmptyResult)" />
-                                    <RadzenLabel Text="Cache Empty Result" Component="@nameof(MysqlQueryRuleModel.CacheEmptyResult)" />
+                                    <RadzenLabel Text='@L["Cache Empty Result"]' Component="@nameof(MysqlQueryRuleModel.CacheEmptyResult)" />
                                 </RadzenStack>
                             </RadzenColumn>
                         </RadzenRow>
@@ -69,7 +70,7 @@
                         <RadzenRow>
                             <RadzenColumn Size="12">
                                 <RadzenStack>
-                                    <RadzenLabel Text="Digest" />
+                                    <RadzenLabel Text='@L["Digest"]' />
                                     <RadzenTextBox @bind-Value=@_queryRule.Digest Name="@nameof(MysqlQueryRuleModel.Digest)" />
                                 </RadzenStack>
                             </RadzenColumn>
@@ -78,13 +79,13 @@
                         <RadzenRow>
                             <RadzenColumn Size="6">
                                 <RadzenStack>
-                                    <RadzenLabel Text="Username" />
+                                    <RadzenLabel Text='@L["Username"]' />
                                     <RadzenTextBox @bind-Value=@_queryRule.Username Name="@nameof(MysqlQueryRuleModel.Username)" />
                                 </RadzenStack>
                             </RadzenColumn>
                             <RadzenColumn Size="6">
                                 <RadzenStack>
-                                    <RadzenLabel Text="Schema Name" />
+                                    <RadzenLabel Text='@L["Schema Name"]' />
                                     <RadzenTextBox @bind-Value=@_queryRule.Schemaname Name="@nameof(MysqlQueryRuleModel.Schemaname)" />
                                 </RadzenStack>
                             </RadzenColumn>
@@ -92,32 +93,32 @@
                         <RadzenRow>
                             <RadzenColumn Size="12">
                                 <RadzenStack>
-                                    <RadzenLabel Text="Comment" />
+                                    <RadzenLabel Text='@L["Comment"]' />
                                     <RadzenTextArea @bind-Value=@_queryRule.Comment Name="@nameof(MysqlQueryRuleModel.Comment)" />
                                 </RadzenStack>
                             </RadzenColumn>
                         </RadzenRow>
 
                         <!-- Expandable Advanced Section -->
-                        <RadzenPanel Text="Advanced Settings" AllowCollapse="true" Collapsed="true">
+                        <RadzenPanel Text='@L["Advanced Settings"]' AllowCollapse="true" Collapsed="true">
                             <RadzenStack Gap="1rem">
                                 <!-- Networking -->
                                 <RadzenRow>
                                     <RadzenColumn Size="4">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Client Address" />
+                                            <RadzenLabel Text='@L["Client Address"]' />
                                             <RadzenTextBox @bind-Value=@_queryRule.ClientAddr Name="@nameof(MysqlQueryRuleModel.ClientAddr)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="4">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Proxy Address" />
+                                            <RadzenLabel Text='@L["Proxy Address"]' />
                                             <RadzenTextBox @bind-Value=@_queryRule.ProxyAddr Name="@nameof(MysqlQueryRuleModel.ProxyAddr)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="4">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Proxy Port" />
+                                            <RadzenLabel Text='@L["Proxy Port"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.ProxyPort Name="@nameof(MysqlQueryRuleModel.ProxyPort)" />
                                         </RadzenStack>
                                     </RadzenColumn>
@@ -127,19 +128,19 @@
                                 <RadzenRow>
                                     <RadzenColumn Size="4">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Flag In" />
+                                            <RadzenLabel Text='@L["Flag In"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.FlagIn Name="@nameof(MysqlQueryRuleModel.FlagIn)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="4">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Flag Out" />
+                                            <RadzenLabel Text='@L["Flag Out"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.FlagOut Name="@nameof(MysqlQueryRuleModel.FlagOut)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="4">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Next Query Flag In" />
+                                            <RadzenLabel Text='@L["Next Query Flag In"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.NextQueryFlagIn Name="@nameof(MysqlQueryRuleModel.NextQueryFlagIn)" />
                                         </RadzenStack>
                                     </RadzenColumn>
@@ -149,13 +150,13 @@
                                 <RadzenRow>
                                     <RadzenColumn Size="6">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Replace Pattern" />
+                                            <RadzenLabel Text='@L["Replace Pattern"]' />
                                             <RadzenTextBox @bind-Value=@_queryRule.ReplacePattern Name="@nameof(MysqlQueryRuleModel.ReplacePattern)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="6">
                                         <RadzenStack>
-                                            <RadzenLabel Text="RE Modifiers" />
+                                            <RadzenLabel Text='@L["RE Modifiers"]' />
                                             <RadzenTextBox @bind-Value=@_queryRule.ReModifiers Name="@nameof(MysqlQueryRuleModel.ReModifiers)" />
                                         </RadzenStack>
                                     </RadzenColumn>
@@ -165,13 +166,13 @@
                                 <RadzenRow>
                                     <RadzenColumn Size="6">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Destination Hostgroup" />
+                                            <RadzenLabel Text='@L["Destination Hostgroup"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.DestinationHostgroup Name="@nameof(MysqlQueryRuleModel.DestinationHostgroup)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="6">
                                         <RadzenStack>
-                                            <RadzenLabel Text="GTID From Hostgroup" />
+                                            <RadzenLabel Text='@L["GTID From Hostgroup"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.GtidFromHostgroup Name="@nameof(MysqlQueryRuleModel.GtidFromHostgroup)" />
                                         </RadzenStack>
                                     </RadzenColumn>
@@ -181,13 +182,13 @@
                                 <RadzenRow>
                                     <RadzenColumn Size="6">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Mirror Flag Out" />
+                                            <RadzenLabel Text='@L["Mirror Flag Out"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.MirrorFlagOut Name="@nameof(MysqlQueryRuleModel.MirrorFlagOut)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="6">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Mirror Hostgroup" />
+                                            <RadzenLabel Text='@L["Mirror Hostgroup"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.MirrorHostgroup Name="@nameof(MysqlQueryRuleModel.MirrorHostgroup)" />
                                         </RadzenStack>
                                     </RadzenColumn>
@@ -197,19 +198,19 @@
                                 <RadzenRow>
                                     <RadzenColumn Size="4">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Cache Timeout" />
+                                            <RadzenLabel Text='@L["Cache Timeout"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.CacheTimeout Name="@nameof(MysqlQueryRuleModel.CacheTimeout)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="4">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Timeout" />
+                                            <RadzenLabel Text='@L["Timeout"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.Timeout Name="@nameof(MysqlQueryRuleModel.Timeout)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="4">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Retries" />
+                                            <RadzenLabel Text='@L["Retries"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.Retries Name="@nameof(MysqlQueryRuleModel.Retries)" Min="0" Max="1000" />
                                         </RadzenStack>
                                     </RadzenColumn>
@@ -219,20 +220,20 @@
                                 <RadzenRow>
                                     <RadzenColumn Size="4">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Delay" />
+                                            <RadzenLabel Text='@L["Delay"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.Delay Name="@nameof(MysqlQueryRuleModel.Delay)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="4">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Multiplex" />
+                                            <RadzenLabel Text='@L["Multiplex"]' />
                                             <RadzenNumeric @bind-Value=@_queryRule.Multiplex Name="@nameof(MysqlQueryRuleModel.Multiplex)" Min="0" Max="2" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="4">
                                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                                             <RadzenCheckBox @bind-Value=@_queryRule.NegateMatchPattern Name="@nameof(MysqlQueryRuleModel.NegateMatchPattern)" />
-                                            <RadzenLabel Text="Negate Match Pattern" Component="@nameof(MysqlQueryRuleModel.NegateMatchPattern)" />
+                                            <RadzenLabel Text='@L["Negate Match Pattern"]' Component="@nameof(MysqlQueryRuleModel.NegateMatchPattern)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                 </RadzenRow>
@@ -241,13 +242,13 @@
                                 <RadzenRow>
                                     <RadzenColumn Size="6">
                                         <RadzenStack>
-                                            <RadzenLabel Text="Error Message" />
+                                            <RadzenLabel Text='@L["Error Message"]' />
                                             <RadzenTextBox @bind-Value=@_queryRule.ErrorMsg Name="@nameof(MysqlQueryRuleModel.ErrorMsg)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="6">
                                         <RadzenStack>
-                                            <RadzenLabel Text="OK Message" />
+                                            <RadzenLabel Text='@L["OK Message"]' />
                                             <RadzenTextBox @bind-Value=@_queryRule.OKMsg Name="@nameof(MysqlQueryRuleModel.OKMsg)" />
                                         </RadzenStack>
                                     </RadzenColumn>
@@ -258,27 +259,27 @@
                                     <RadzenColumn Size="4">
                                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                                             <RadzenCheckBox @bind-Value=@_queryRule.Log Name="@nameof(MysqlQueryRuleModel.Log)" />
-                                            <RadzenLabel Text="Log" Component="@nameof(MysqlQueryRuleModel.Log)" />
+                                            <RadzenLabel Text='@L["Log"]' Component="@nameof(MysqlQueryRuleModel.Log)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="4">
                                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                                             <RadzenCheckBox @bind-Value=@_queryRule.Reconnect Name="@nameof(MysqlQueryRuleModel.Reconnect)" />
-                                            <RadzenLabel Text="Reconnect" Component="@nameof(MysqlQueryRuleModel.Reconnect)" />
+                                            <RadzenLabel Text='@L["Reconnect"]' Component="@nameof(MysqlQueryRuleModel.Reconnect)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                     <RadzenColumn Size="4">
                                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                                             <RadzenCheckBox @bind-Value=@_queryRule.StickyConn Name="@nameof(MysqlQueryRuleModel.StickyConn)" />
-                                            <RadzenLabel Text="Sticky Connection" Component="@nameof(MysqlQueryRuleModel.StickyConn)" />
+                                            <RadzenLabel Text='@L["Sticky Connection"]' Component="@nameof(MysqlQueryRuleModel.StickyConn)" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                 </RadzenRow>
                             </RadzenStack>
                         </RadzenPanel>
                         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem">
-                            <RadzenButton ButtonType="ButtonType.Submit" Text="Save" ButtonStyle="ButtonStyle.Primary" />
-                            <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click=@OnCancel />
+                            <RadzenButton ButtonType="ButtonType.Submit" Text='@L["Save"]' ButtonStyle="ButtonStyle.Primary" />
+                            <RadzenButton Text='@L["Cancel"]' ButtonStyle="ButtonStyle.Light" Click=@OnCancel />
                         </RadzenStack>
                     </RadzenStack>
                 </RadzenCard>

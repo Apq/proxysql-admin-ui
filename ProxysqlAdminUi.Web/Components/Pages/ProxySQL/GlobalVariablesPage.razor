@@ -7,26 +7,27 @@
 
 @inject ProxySqlRepository ProxySqlRepository
 @inject NotificationService NotificationService
+@inject LocalizationService L
 
 <RadzenStack Gap="1rem">
-    <RadzenText TextStyle="TextStyle.H3">Global Variables</RadzenText>
+    <RadzenText TextStyle="TextStyle.H3">@L["Global Variables"]</RadzenText>
 
     <RadzenDataGrid @ref="variablesGrid" Data="@_variables" TItem="GlobalVariableModel"
                     AllowFiltering="true" AllowSorting="true" AllowPaging="true" PageSize="20"
                     EditMode="DataGridEditMode.Single" RowUpdate="@OnUpdateRow">
         <Columns>
             <RadzenDataGridColumn TItem="GlobalVariableModel" Property="@nameof(GlobalVariableModel.VariableName)"
-                                  Title="Variable Name" Width="300px">
+                                  Title='@L["Variable Name"]' Width="300px">
                 <FooterTemplate>
-                    Total Variables: @(_variables?.Count() ?? 0)
+                    @L["Total Variables"]: @(_variables?.Count() ?? 0)
                 </FooterTemplate>
             </RadzenDataGridColumn>
 
             <RadzenDataGridColumn TItem="GlobalVariableModel" Property="@nameof(GlobalVariableModel.VariableValue)"
-                                  Title="Value" Width="300px">
+                                  Title='@L["Value"]' Width="300px">
                 <EditTemplate Context="variable">
                     <RadzenTextBox @bind-Value="variable.VariableValue" Style="width:100%" Name="Value" />
-                    <RadzenRequiredValidator Text="Value is required" Component="Value" Popup="true" />
+                    <RadzenRequiredValidator Text='@L["Value is required"]' Component="Value" Popup="true" />
                 </EditTemplate>
             </RadzenDataGridColumn>
 
@@ -78,12 +79,12 @@
         try
         {
             await ProxySqlRepository.UpdateGlobalVariable(variable);
-            NotificationService.Notify(NotificationSeverity.Success, "Success", "Variable updated");
+            NotificationService.Notify(NotificationSeverity.Success, L["Success"], L["Variable updated"]);
             _originalValues.Remove(variable.VariableName);
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, L["Error"], ex.Message);
             if (_originalValues.ContainsKey(variable.VariableName))
             {
                 variable.VariableValue = _originalValues[variable.VariableName];

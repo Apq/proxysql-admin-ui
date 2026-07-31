@@ -8,6 +8,7 @@
 @inject ProxySqlRepository ProxySqlRepository
 @inject DialogService DialogService
 @inject NotificationService NotificationService
+@inject LocalizationService L
 
 <RadzenContent Container="main">
     <div class="row justify-content-center">
@@ -16,22 +17,22 @@
                 <RadzenCard>
                     <div class="row">
                         <div class="col">
-                            <h3 class="h5">Confirm Delete</h3>
+                            <h3 class="h5">@L["Confirm Delete"]</h3>
                             <div class="row mb-3">
                                 <div class="col">
-                                    <p>Are you sure you want to delete Query Rule #@RuleId?</p>
+                                    <p>@L["Are you sure you want to delete Query Rule #"]@RuleId?</p>
                                     @if (queryRule != null)
                                     {
                                         <div class="alert alert-info">
-                                            <strong>Rule Details:</strong><br />
-                                            Rule ID: @queryRule.RuleId<br />
-                                            Active: @queryRule.Active<br />
-                                            Username: @queryRule.Username<br />
-                                            Schema Name: @queryRule.Schemaname<br />
-                                            Client Addr: @queryRule.ClientAddr<br />
-                                            Proxy Addr: @queryRule.ProxyAddr<br />
-                                            Match Digest: @queryRule.MatchDigest<br />
-                                            Match Pattern: @queryRule.MatchPattern
+                                            <strong>@L["Rule Details:"]</strong><br />
+                                            @L["Rule ID"]: @queryRule.RuleId<br />
+                                            @L["Active"]: @queryRule.Active<br />
+                                            @L["Username"]: @queryRule.Username<br />
+                                            @L["Schema Name"]: @queryRule.Schemaname<br />
+                                            @L["Client Address"]: @queryRule.ClientAddr<br />
+                                            @L["Proxy Address"]: @queryRule.ProxyAddr<br />
+                                            @L["Match Digest"]: @queryRule.MatchDigest<br />
+                                            @L["Match Pattern"]: @queryRule.MatchPattern
                                         </div>
                                     }
                                 </div>
@@ -40,11 +41,11 @@
                                 <div class="col d-flex justify-content-end gap-2">
                                     <RadzenButton ButtonType="ButtonType.Submit" 
                                                 Icon="delete" 
-                                                Text="Delete"
+                                                Text='@L["Delete"]'
                                                 ButtonStyle="ButtonStyle.Danger" />
                                     <RadzenButton ButtonType="ButtonType.Button"
                                                 Icon="cancel" 
-                                                Text="Cancel"
+                                                Text='@L["Cancel"]'
                                                 ButtonStyle="ButtonStyle.Light"
                                                 Click=@OnCancel />
                                 </div>
@@ -73,7 +74,7 @@
         }
         catch (Exception ex)
         { 
-            NotificationService.Notify(NotificationSeverity.Error, "Error","Failed to load query rule details.\r\n" + ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, L["Error"], L["Failed to load query rule details."] + "\r\n" + ex.Message);
 
             DialogService.Close();
         }
@@ -88,14 +89,14 @@
         {
             await ProxySqlRepository.DeleteMySqlQueryRule(RuleId);
 
-            NotificationService.Notify(NotificationSeverity.Success, "Success", 
-                $"Query Rule #{RuleId} has been deleted.");
+            NotificationService.Notify(NotificationSeverity.Success, L["Success"],
+                L["Query Rule #"] + RuleId + L[" has been deleted."]);
             DialogService.Close();
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Error", 
-                "Failed to delete query rule.\r\n"+ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, L["Error"],
+                L["Failed to delete query rule."] + "\r\n" + ex.Message);
         }
     }
 

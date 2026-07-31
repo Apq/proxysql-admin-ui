@@ -70,6 +70,7 @@ builder.Services.AddSingleton<IEmailSender<ProxysqlAdminUiWebUser>, IdentityNoOp
 builder.Services.AddOutputCache();
 
 builder.Services.AddScoped<DefaultUserSeedService>();
+builder.Services.AddScoped<LocalizationService>();
 
 builder.Services.AddSingleton<AppVersion>();
 

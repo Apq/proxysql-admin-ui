@@ -1,25 +1,48 @@
 ﻿@inherits LayoutComponentBase
+@implements IDisposable
 @inject AppVersion AppVersion
+@inject LocalizationService L
 
 <RadzenComponents @rendermode="InteractiveServer" />
 
 <RadzenLayout>
     <RadzenHeader>
-        <RadzenMenu>
-            <RadzenMenuItem Text="Home" Icon="home" Path="/" />
-            <RadzenMenuItem Text="Mysql Users" Icon="account_box" Path="/mysql/users" />
-            <RadzenMenuItem Text="Mysql Servers" Icon="dns" Path="/mysql/servers" />
-            <RadzenMenuItem Text="Rules" Icon="quiz" Path="/mysql/rules" />
-            <RadzenMenuItem Text="Query Digest" Icon="query_stats" Path="/mysql/queries/digest" />
-            <RadzenMenuItem Text="Global Variables" Icon="settings" Path="/proxysql/global-variables" />
-            <RadzenMenuItem Text="Actions" Icon="build" Path="/proxysql/actions" />
-        </RadzenMenu>
-       
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+            <RadzenMenu>
+                <RadzenMenuItem Text="@HomeText" Icon="home" Path="/" />
+                <RadzenMenuItem Text="@UsersText" Icon="account_box" Path="/mysql/users" />
+                <RadzenMenuItem Text="@ServersText" Icon="dns" Path="/mysql/servers" />
+                <RadzenMenuItem Text="@RulesText" Icon="quiz" Path="/mysql/rules" />
+                <RadzenMenuItem Text="@DigestText" Icon="query_stats" Path="/mysql/queries/digest" />
+                <RadzenMenuItem Text="@VariablesText" Icon="settings" Path="/proxysql/global-variables" />
+                <RadzenMenuItem Text="@ActionsText" Icon="build" Path="/proxysql/actions" />
+            </RadzenMenu>
+            <LanguageSwitcher />
+        </RadzenStack>
     </RadzenHeader>
     <RadzenBody>
-        @Body
+        <div @key="L.CurrentLanguage">
+            @Body
+        </div>
     </RadzenBody>
     <RadzenFooter Style="height:30px;padding-top:2px;">
-        <RadzenBadge BadgeStyle="BadgeStyle.Info"><RadzenLink Style="color:white;" Path="@("https://github.com/Dotfinity/proxysql-admin-ui/releases/"+AppVersion.Version)" Text="@AppVersion.Version" /></RadzenBadge>
+        <RadzenBadge BadgeStyle="BadgeStyle.Info"><RadzenLink Style="color:white;" Path="@VersionUrl" Text="@AppVersion.Version" /></RadzenBadge>
     </RadzenFooter>
 </RadzenLayout>
+
+@code {
+    private string HomeText => L["Home"];
+    private string UsersText => L["MySQL Users"];
+    private string ServersText => L["MySQL Servers"];
+    private string RulesText => L["Rules"];
+    private string DigestText => L["Query Digest"];
+    private string VariablesText => L["Global Variables"];
+    private string ActionsText => L["Actions"];
+    private string VersionUrl => $"https://github.com/Dotfinity/proxysql-admin-ui/releases/{AppVersion.Version}";
+
+    protected override void OnInitialized() => L.Changed += Refresh;
+
+    private void Refresh() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => L.Changed -= Refresh;
+}

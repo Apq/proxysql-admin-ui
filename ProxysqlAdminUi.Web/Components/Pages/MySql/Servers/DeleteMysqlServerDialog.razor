@@ -6,6 +6,7 @@
 @inject ProxySqlRepository ProxySqlRepository
 @inject DialogService DialogService
 @inject NotificationService NotificationService
+@inject LocalizationService L
 
 @if (_isLoading)
 {
@@ -15,21 +16,21 @@ else if (_server is not null)
 {
     <RadzenStack Gap="1rem">
         <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" Variant="Variant.Flat">
-            This removes the server from ProxySQL, loads the new server configuration to Runtime, and saves it to Disk.
+            @L["This removes the server from ProxySQL, loads the new server configuration to Runtime, and saves it to Disk."]
         </RadzenAlert>
 
         <RadzenCard>
             <RadzenStack Gap="0.5rem">
-                <RadzenText><strong>Hostgroup:</strong> @_server.HostgroupId</RadzenText>
-                <RadzenText><strong>Server:</strong> @_server.Hostname:@_server.Port</RadzenText>
-                <RadzenText><strong>Status:</strong> @_server.Status</RadzenText>
-                <RadzenText><strong>Weight:</strong> @_server.Weight</RadzenText>
+                <RadzenText><strong>@L["Hostgroup"]:</strong> @_server.HostgroupId</RadzenText>
+                <RadzenText><strong>@L["Server"]:</strong> @_server.Hostname:@_server.Port</RadzenText>
+                <RadzenText><strong>@L["Status"]:</strong> @_server.Status</RadzenText>
+                <RadzenText><strong>@L["Weight"]:</strong> @_server.Weight</RadzenText>
             </RadzenStack>
         </RadzenCard>
 
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.75rem">
-            <RadzenButton Text="Cancel" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@Cancel" Disabled="@_isDeleting" />
-            <RadzenButton Text="Delete, load & persist" Icon="delete" ButtonStyle="ButtonStyle.Danger"
+            <RadzenButton Text='@L["Cancel"]' Icon="close" ButtonStyle="ButtonStyle.Light" Click="@Cancel" Disabled="@_isDeleting" />
+            <RadzenButton Text='@L["Delete, load & persist"]' Icon="delete" ButtonStyle="ButtonStyle.Danger"
                           Click="@DeleteAsync" IsBusy="@_isDeleting" Disabled="@_isDeleting" />
         </RadzenStack>
     </RadzenStack>
@@ -49,11 +50,11 @@ else if (_server is not null)
         try
         {
             _server = await ProxySqlRepository.GetMySqlServer(HostgroupId, Hostname, Port)
-                ?? throw new InvalidOperationException("The selected MySQL server was not found.");
+                ?? throw new InvalidOperationException(L["The selected MySQL server was not found."]);
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Failed to load server", ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, L["Failed to load server"], ex.Message);
             DialogService.Close(false);
         }
         finally
@@ -70,13 +71,13 @@ else if (_server is not null)
             await ProxySqlRepository.DeleteMySqlServer(HostgroupId, Hostname, Port);
             NotificationService.Notify(
                 NotificationSeverity.Success,
-                "Server deleted",
-                "The change is active in Runtime and saved to Disk.");
+                L["Server deleted"],
+                L["The change is active in Runtime and saved to Disk."]);
             DialogService.Close(true);
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Failed to delete server", ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, L["Failed to delete server"], ex.Message);
         }
         finally
         {

@@ -1,0 +1,38 @@
+@implements IDisposable
+@inject LocalizationService Localization
+@inject IJSRuntime JSRuntime
+
+<RadzenDropDown TValue="string" Data="@LanguageOptions" TextProperty="Label" ValueProperty="Code"
+                Value="@Localization.CurrentLanguage" Change="@ChangeLanguage"
+                Style="width: 110px" AllowClear="false" />
+
+@code {
+    private static readonly IReadOnlyList<LanguageOption> LanguageOptions =
+    [
+        new("en-US", "English"),
+        new("zh-CN", "中文")
+    ];
+
+    private sealed record LanguageOption(string Code, string Label);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var language = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "proxysql-admin-ui-language");
+        if (!string.IsNullOrWhiteSpace(language))
+        {
+            Localization.SetLanguage(language);
+        }
+        Localization.Changed += Refresh;
+    }
+
+    private async Task ChangeLanguage(object value)
+    {
+        var language = value?.ToString() ?? "en-US";
+        Localization.SetLanguage(language);
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "proxysql-admin-ui-language", Localization.CurrentLanguage);
+    }
+
+    private void Refresh() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Localization.Changed -= Refresh;
+}

@@ -6,6 +6,7 @@
 @inject ProxySqlRepository ProxySqlRepository
 @inject DialogService DialogService
 @inject NotificationService NotificationService
+@inject LocalizationService L
 
 @if (_isLoading)
 {
@@ -17,23 +18,23 @@ else
         <DataAnnotationsValidator />
         <RadzenStack Gap="1rem">
             <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" Variant="Variant.Flat">
-                Saving updates the ProxySQL memory table, loads MySQL servers to Runtime, and saves them to Disk.
+                @L["Saving updates the ProxySQL memory table, loads MySQL servers to Runtime, and saves them to Disk."]
             </RadzenAlert>
 
             <RadzenRow>
                 <RadzenColumn Size="4">
-                    <RadzenFormField Text="Hostgroup" Variant="Variant.Outlined">
+                    <RadzenFormField Text='@L["Hostgroup"]' Variant="Variant.Outlined">
                         <RadzenNumeric @bind-Value="_server.HostgroupId" Name="HostgroupId" Min="0" Style="width: 100%" />
                     </RadzenFormField>
                 </RadzenColumn>
                 <RadzenColumn Size="5">
-                    <RadzenFormField Text="Hostname" Variant="Variant.Outlined">
+                    <RadzenFormField Text='@L["Hostname"]' Variant="Variant.Outlined">
                         <RadzenTextBox @bind-Value="_server.Hostname" Name="Hostname" Style="width: 100%" />
                     </RadzenFormField>
-                    <RadzenRequiredValidator Component="Hostname" Text="Hostname is required" Popup="true" />
+                    <RadzenRequiredValidator Component="Hostname" Text='@L["Hostname is required"]' Popup="true" />
                 </RadzenColumn>
                 <RadzenColumn Size="3">
-                    <RadzenFormField Text="Port" Variant="Variant.Outlined">
+                    <RadzenFormField Text='@L["Port"]' Variant="Variant.Outlined">
                         <RadzenNumeric @bind-Value="_server.Port" Name="Port" Min="1" Max="65535" Style="width: 100%" />
                     </RadzenFormField>
                 </RadzenColumn>
@@ -41,17 +42,17 @@ else
 
             <RadzenRow>
                 <RadzenColumn Size="4">
-                    <RadzenFormField Text="Status" Variant="Variant.Outlined">
+                    <RadzenFormField Text='@L["Status"]' Variant="Variant.Outlined">
                         <RadzenDropDown @bind-Value="_server.Status" Data="@_statuses" Name="Status" Style="width: 100%" />
                     </RadzenFormField>
                 </RadzenColumn>
                 <RadzenColumn Size="4">
-                    <RadzenFormField Text="Weight" Variant="Variant.Outlined">
+                    <RadzenFormField Text='@L["Weight"]' Variant="Variant.Outlined">
                         <RadzenNumeric @bind-Value="_server.Weight" Name="Weight" Min="0" Max="10000000" Style="width: 100%" />
                     </RadzenFormField>
                 </RadzenColumn>
                 <RadzenColumn Size="4">
-                    <RadzenFormField Text="GTID port" Variant="Variant.Outlined">
+                    <RadzenFormField Text='@L["GTID port"]' Variant="Variant.Outlined">
                         <RadzenNumeric @bind-Value="_server.GtidPort" Name="GtidPort" Min="0" Max="65535" Style="width: 100%" />
                     </RadzenFormField>
                 </RadzenColumn>
@@ -59,17 +60,17 @@ else
 
             <RadzenRow>
                 <RadzenColumn Size="4">
-                    <RadzenFormField Text="Max connections" Variant="Variant.Outlined">
+                    <RadzenFormField Text='@L["Max connections"]' Variant="Variant.Outlined">
                         <RadzenNumeric @bind-Value="_server.MaxConnections" Name="MaxConnections" Min="0" Style="width: 100%" />
                     </RadzenFormField>
                 </RadzenColumn>
                 <RadzenColumn Size="4">
-                    <RadzenFormField Text="Max replication lag" Variant="Variant.Outlined">
+                    <RadzenFormField Text='@L["Max replication lag"]' Variant="Variant.Outlined">
                         <RadzenNumeric @bind-Value="_server.MaxReplicationLag" Name="MaxReplicationLag" Min="0" Style="width: 100%" />
                     </RadzenFormField>
                 </RadzenColumn>
                 <RadzenColumn Size="4">
-                    <RadzenFormField Text="Max latency (ms)" Variant="Variant.Outlined">
+                    <RadzenFormField Text='@L["Max latency (ms)"]' Variant="Variant.Outlined">
                         <RadzenNumeric @bind-Value="_server.MaxLatencyMs" Name="MaxLatencyMs" Min="0" Style="width: 100%" />
                     </RadzenFormField>
                 </RadzenColumn>
@@ -77,27 +78,27 @@ else
 
             <RadzenRow>
                 <RadzenColumn Size="4">
-                    <RadzenFormField Text="Use SSL" Variant="Variant.Outlined">
+                    <RadzenFormField Text='@L["Use SSL"]' Variant="Variant.Outlined">
                         <RadzenDropDown @bind-Value="_server.UseSsl" Data="@_binaryOptions" TextProperty="Text" ValueProperty="Value"
                                         Name="UseSsl" Style="width: 100%" />
                     </RadzenFormField>
                 </RadzenColumn>
                 <RadzenColumn Size="4">
-                    <RadzenFormField Text="Compression" Variant="Variant.Outlined">
+                    <RadzenFormField Text='@L["Compression"]' Variant="Variant.Outlined">
                         <RadzenDropDown @bind-Value="_server.Compression" Data="@_binaryOptions" TextProperty="Text" ValueProperty="Value"
                                         Name="Compression" Style="width: 100%" />
                     </RadzenFormField>
                 </RadzenColumn>
                 <RadzenColumn Size="4">
-                    <RadzenFormField Text="Comment" Variant="Variant.Outlined">
+                    <RadzenFormField Text='@L["Comment"]' Variant="Variant.Outlined">
                         <RadzenTextBox @bind-Value="_server.Comment" Name="Comment" Style="width: 100%" />
                     </RadzenFormField>
                 </RadzenColumn>
             </RadzenRow>
 
             <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.75rem">
-                <RadzenButton Text="Cancel" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@Cancel" Disabled="@_isSaving" />
-                <RadzenButton Text="Save, load & persist" Icon="save" ButtonType="ButtonType.Submit"
+                <RadzenButton Text='@L["Cancel"]' Icon="close" ButtonStyle="ButtonStyle.Light" Click="@Cancel" Disabled="@_isSaving" />
+                <RadzenButton Text='@L["Save, load & persist"]' Icon="save" ButtonType="ButtonType.Submit"
                               ButtonStyle="ButtonStyle.Primary" IsBusy="@_isSaving" Disabled="@_isSaving" />
             </RadzenStack>
         </RadzenStack>
@@ -127,11 +128,11 @@ else
         try
         {
             _server = await ProxySqlRepository.GetMySqlServer(HostgroupId!.Value, Hostname!, Port!.Value)
-                ?? throw new InvalidOperationException("The selected MySQL server was not found.");
+                ?? throw new InvalidOperationException(L["The selected MySQL server was not found."]);
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Failed to load server", ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, L["Failed to load server"], ex.Message);
             DialogService.Close(false);
         }
         finally
@@ -156,13 +157,13 @@ else
 
             NotificationService.Notify(
                 NotificationSeverity.Success,
-                IsEdit ? "Server updated" : "Server added",
-                "The change is active in Runtime and saved to Disk.");
+                IsEdit ? L["Server updated"] : L["Server added"],
+                L["The change is active in Runtime and saved to Disk."]);
             DialogService.Close(true);
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Failed to save server", ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, L["Failed to save server"], ex.Message);
         }
         finally
         {

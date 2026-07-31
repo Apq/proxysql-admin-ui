@@ -7,15 +7,16 @@
 
 @inject ProxySqlRepository ProxySqlRepository
 @inject DialogService DialogService
+@inject LocalizationService L
 
 <RadzenRow AlignItems="AlignItems.Normal" Gap="">
     <RadzenColumn Order="1" Size="3">
-        <RadzenText Text="Query Rules" TextStyle="TextStyle.DisplayH3" TextAlign="TextAlign.Left" />
+        <RadzenText Text='@L["Query Rules"]' TextStyle="TextStyle.DisplayH3" TextAlign="TextAlign.Left" />
     </RadzenColumn>
     <RadzenColumn Order="10" Size="3" Offset="6">
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem">
-            <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Text="Refresh" Click="RefreshRules" />
-            <RadzenButton Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Add Rule" Click="CreateNewQueryRule" />
+            <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Text='@L["Refresh"]' Click="RefreshRules" />
+            <RadzenButton Icon="add" ButtonStyle="ButtonStyle.Primary" Text='@L["Add rule"]' Click="CreateNewQueryRule" />
         </RadzenStack>
     </RadzenColumn>
 </RadzenRow>
@@ -28,43 +29,43 @@
             <RadzenCardGroup Responsive="true">
                 <RadzenCard Variant="Variant.Text">
                     <RadzenRow>
-                        <RadzenLabel>Rule Id:</RadzenLabel> <RadzenText>@rule.RuleId</RadzenText>
+                        <RadzenLabel>@L["Rule ID"]:</RadzenLabel> <RadzenText>@rule.RuleId</RadzenText>
                     </RadzenRow>
                     @if (rule.Comment != null)
                     {
                         <RadzenRow>
-                            <RadzenLabel>Comment:</RadzenLabel> <RadzenText>@rule.Comment</RadzenText>
+                            <RadzenLabel>@L["Comment"]:</RadzenLabel> <RadzenText>@rule.Comment</RadzenText>
                         </RadzenRow>
                     }
                     <RadzenRow>
-                        <RadzenLabel>Apply:</RadzenLabel> <RadzenText>@rule.Apply</RadzenText>
+                        <RadzenLabel>@L["Apply"]:</RadzenLabel> <RadzenText>@rule.Apply</RadzenText>
                     </RadzenRow>
                     <RadzenRow>
-                        <RadzenLabel>Active:</RadzenLabel> <RadzenText>@rule.Active</RadzenText>
+                        <RadzenLabel>@L["Active"]:</RadzenLabel> <RadzenText>@rule.Active</RadzenText>
                     </RadzenRow>
                     @if (rule.CacheTtl != null)
                     {
                         <RadzenRow>
-                            <RadzenLabel>Cache TTL (ms):</RadzenLabel> <RadzenText>@(rule.CacheTtl)</RadzenText>
+                            <RadzenLabel>@L["Cache TTL (ms)"]:</RadzenLabel> <RadzenText>@(rule.CacheTtl)</RadzenText>
                         </RadzenRow>
                     }
 
                     @if (rule.CacheEmptyResult != null)
                     {
                         <RadzenRow>
-                            <RadzenLabel>Cache Empty Results:</RadzenLabel> <RadzenText>@(rule.CacheEmptyResult)</RadzenText>
+                            <RadzenLabel>@L["Cache Empty Results"]:</RadzenLabel> <RadzenText>@(rule.CacheEmptyResult)</RadzenText>
                         </RadzenRow>
                     }
                     @if (rule.Timeout != null)
                     {
                         <RadzenRow>
-                            <RadzenLabel>Timeout:</RadzenLabel> <RadzenText>@(rule.Timeout)</RadzenText>
+                            <RadzenLabel>@L["Timeout"]:</RadzenLabel> <RadzenText>@(rule.Timeout)</RadzenText>
                         </RadzenRow>
                     }
                     @if (rule.Log != null)
                     {
                         <RadzenRow>
-                            <RadzenLabel>Log:</RadzenLabel> <RadzenText>@(rule.Log)</RadzenText>
+                            <RadzenLabel>@L["Log"]:</RadzenLabel> <RadzenText>@(rule.Log)</RadzenText>
                         </RadzenRow>
                     }
                 </RadzenCard>
@@ -72,60 +73,60 @@
                     @if (rule.Username != null)
                     {
                         <RadzenRow>
-                            <RadzenLabel>Username:</RadzenLabel> <RadzenText>@(rule.Username)</RadzenText>
+                            <RadzenLabel>@L["Username"]:</RadzenLabel> <RadzenText>@(rule.Username)</RadzenText>
                         </RadzenRow>
                     }
                     @if (rule.Schemaname != null)
                     {
                         <RadzenRow>
-                            <RadzenLabel>Schema Name:</RadzenLabel> <RadzenText>@(rule.Schemaname)</RadzenText>
+                            <RadzenLabel>@L["Schema Name"]:</RadzenLabel> <RadzenText>@(rule.Schemaname)</RadzenText>
                         </RadzenRow>
                     }
 
                     @if (rule.DestinationHostgroup != null)
                     {
                         <RadzenRow>
-                            <RadzenLabel>Destination host group:</RadzenLabel> <RadzenText>@(rule.DestinationHostgroup)</RadzenText>
+                            <RadzenLabel>@L["Destination host group"]:</RadzenLabel> <RadzenText>@(rule.DestinationHostgroup)</RadzenText>
                         </RadzenRow>
                     }
                     @if (rule.Digest != null)
                     {
                         <RadzenRow>
-                            <RadzenLabel>Digest:</RadzenLabel> <RadzenText>@(rule.Digest)</RadzenText>
+                            <RadzenLabel>@L["Digest"]:</RadzenLabel> <RadzenText>@(rule.Digest)</RadzenText>
                         </RadzenRow>
                         <RadzenRow>
-                            <RadzenLabel>Digest Text:</RadzenLabel> <RadzenText TextStyle="TextStyle.Subtitle1" Text="@(rule.DigestText)"></RadzenText>
+                            <RadzenLabel>@L["Digest Text"]:</RadzenLabel> <RadzenText TextStyle="TextStyle.Subtitle1" Text="@(rule.DigestText)"></RadzenText>
                         </RadzenRow>
                     }
                     @if (rule.MatchDigest != null)
                     {
                         <RadzenRow>
-                            <RadzenLabel>Match Digest:</RadzenLabel> <RadzenText>@(rule.MatchDigest)</RadzenText>
+                            <RadzenLabel>@L["Match Digest"]:</RadzenLabel> <RadzenText>@(rule.MatchDigest)</RadzenText>
                         </RadzenRow>
                     }
 
                     @if (rule.MatchPattern != null)
                     {
                         <RadzenRow>
-                            <RadzenLabel>Match Pattern:</RadzenLabel> <RadzenText>@(rule.MatchPattern)</RadzenText>
+                            <RadzenLabel>@L["Match Pattern"]:</RadzenLabel> <RadzenText>@(rule.MatchPattern)</RadzenText>
                         </RadzenRow>
                         <RadzenRow>
-                            <RadzenLabel>Negate Match Pattern:</RadzenLabel> <RadzenText>@(rule.NegateMatchPattern)</RadzenText>
+                            <RadzenLabel>@L["Negate Match Pattern"]:</RadzenLabel> <RadzenText>@(rule.NegateMatchPattern)</RadzenText>
                         </RadzenRow>
                     }
                     @if (rule.ReplacePattern != null)
                     {
                         <RadzenRow>
-                            <RadzenLabel>Replace Pattern:</RadzenLabel> <RadzenText>@(rule.ReplacePattern)</RadzenText>
+                            <RadzenLabel>@L["Replace Pattern"]:</RadzenLabel> <RadzenText>@(rule.ReplacePattern)</RadzenText>
                         </RadzenRow>
                     }
                 </RadzenCard>
                 <RadzenCard Variant="Variant.Text">
                     <RadzenRow>
-                        <RadzenLabel>Processed Queries:</RadzenLabel> <RadzenText>@(rule.CountStar)</RadzenText>
+                        <RadzenLabel>@L["Processed Queries"]:</RadzenLabel> <RadzenText>@(rule.CountStar)</RadzenText>
                     </RadzenRow>
                     <RadzenRow>
-                        <RadzenLabel>Cached Queries:</RadzenLabel> <RadzenText>@(rule.Hits)</RadzenText>
+                        <RadzenLabel>@L["Cached Queries"]:</RadzenLabel> <RadzenText>@(rule.Hits)</RadzenText>
                     </RadzenRow>
                     <RadzenChart Style="width: 100%; max-width: 600px;">
                         <RadzenPieSeries Data=@GetChartEntry(rule.RuleId) ValueProperty="Count" CategoryProperty="Type">
@@ -135,8 +136,8 @@
                 </RadzenCard>
                 <RadzenCard Variant="Variant.Text">
                     <RadzenStack>
-                        <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Primary" Text="Edit" Click="async () => await ShowEditModal(rule.RuleId)"></RadzenButton>
-                        <RadzenButton Icon="Report" ButtonStyle="ButtonStyle.Danger" Text="Delete" Click="async () => await ShowDeleteModal(rule.RuleId)"></RadzenButton>
+                        <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Primary" Text='@L["Edit"]' Click="async () => await ShowEditModal(rule.RuleId)"></RadzenButton>
+                        <RadzenButton Icon="Report" ButtonStyle="ButtonStyle.Danger" Text='@L["Delete"]' Click="async () => await ShowDeleteModal(rule.RuleId)"></RadzenButton>
                     </RadzenStack>
                 </RadzenCard>
             </RadzenCardGroup>
@@ -181,7 +182,7 @@
     
     private async Task ShowEditModal(int ruleId)
     {
-        await DialogService.OpenAsync<EditQueryRuleDialog>("Edit Rule " + ruleId,
+        await DialogService.OpenAsync<EditQueryRuleDialog>(L["Edit Rule"] + " " + ruleId,
             parameters: new Dictionary<string, object?>() { { "RuleId", ruleId } },
             options: new DialogOptions() { CloseDialogOnEsc = true });
 
@@ -192,7 +193,7 @@
 
     private async Task ShowDeleteModal(int ruleId)
     {
-        await DialogService.OpenAsync<DeleteQueryRuleDialog>("Delete Rule " + ruleId,
+        await DialogService.OpenAsync<DeleteQueryRuleDialog>(L["Delete Rule"] + " " + ruleId,
             parameters: new Dictionary<string, object?>() { { "RuleId", ruleId } },
             options: new DialogOptions()
                 {
@@ -204,7 +205,7 @@
 
     private async Task CreateNewQueryRule()
     {
-        await DialogService.OpenAsync<AddQueryRuleDialog>("Add Query Rule", options: new DialogOptions()
+        await DialogService.OpenAsync<AddQueryRuleDialog>(L["Add rule"], options: new DialogOptions()
             {
                 CloseDialogOnEsc = true,
             });

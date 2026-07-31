@@ -6,6 +6,7 @@
 @inject ProxySqlRepository ProxySqlRepository
 @inject DialogService DialogService
 @inject NotificationService NotificationService
+@inject LocalizationService L
 
 @if (_isLoading)
 {
@@ -15,19 +16,19 @@ else if (_user is not null)
 {
     <RadzenStack Gap="1rem">
         <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" Variant="Variant.Flat">
-            This removes the user from ProxySQL, loads the new user configuration to Runtime, and saves it to Disk.
+            @L["This removes the user from ProxySQL, loads the new user configuration to Runtime, and saves it to Disk."]
         </RadzenAlert>
         <RadzenCard>
             <RadzenStack Gap="0.5rem">
-                <RadzenText><strong>Username:</strong> @_user.Username</RadzenText>
-                <RadzenText><strong>Backend:</strong> @_user.Backend</RadzenText>
-                <RadzenText><strong>Frontend:</strong> @_user.Frontend</RadzenText>
-                <RadzenText><strong>Default hostgroup:</strong> @_user.DefaultHostgroup</RadzenText>
+                <RadzenText><strong>@L["Username"]:</strong> @_user.Username</RadzenText>
+                <RadzenText><strong>@L["Backend"]:</strong> @_user.Backend</RadzenText>
+                <RadzenText><strong>@L["Frontend"]:</strong> @_user.Frontend</RadzenText>
+                <RadzenText><strong>@L["Default hostgroup"]:</strong> @_user.DefaultHostgroup</RadzenText>
             </RadzenStack>
         </RadzenCard>
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.75rem">
-            <RadzenButton Text="Cancel" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@Cancel" Disabled="@_isDeleting" />
-            <RadzenButton Text="Delete, load & persist" Icon="delete" ButtonStyle="ButtonStyle.Danger"
+            <RadzenButton Text='@L["Cancel"]' Icon="close" ButtonStyle="ButtonStyle.Light" Click="@Cancel" Disabled="@_isDeleting" />
+            <RadzenButton Text='@L["Delete, load & persist"]' Icon="delete" ButtonStyle="ButtonStyle.Danger"
                           Click="@DeleteAsync" IsBusy="@_isDeleting" Disabled="@_isDeleting" />
         </RadzenStack>
     </RadzenStack>
@@ -46,11 +47,11 @@ else if (_user is not null)
         try
         {
             _user = await ProxySqlRepository.GetMySqlUser(Username, Backend)
-                ?? throw new InvalidOperationException("The selected MySQL user was not found.");
+                ?? throw new InvalidOperationException(L["The selected MySQL user was not found."]);
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Failed to load user", ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, L["Failed to load user"], ex.Message);
             DialogService.Close(false);
         }
         finally
@@ -65,13 +66,13 @@ else if (_user is not null)
         try
         {
             await ProxySqlRepository.DeleteMySqlUser(Username, Backend);
-            NotificationService.Notify(NotificationSeverity.Success, "User deleted",
-                "The change is active in Runtime and saved to Disk.");
+            NotificationService.Notify(NotificationSeverity.Success, L["User deleted"],
+                L["The change is active in Runtime and saved to Disk."]);
             DialogService.Close(true);
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Failed to delete user", ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, L["Failed to delete user"], ex.Message);
         }
         finally
         {

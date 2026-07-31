@@ -8,16 +8,17 @@
 @inject ProxySqlRepository ProxySqlRepository
 @inject DialogService DialogService
 @inject NotificationService NotificationService
+@inject LocalizationService L
 
 <RadzenStack Gap="1rem">
     <RadzenRow AlignItems="AlignItems.Center">
         <RadzenColumn Size="6">
-            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1">MySQL Users</RadzenText>
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1">@L["MySQL Users"]</RadzenText>
         </RadzenColumn>
         <RadzenColumn Size="6">
             <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
-                <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadUsersAsync" Disabled="@_isLoading" />
-                <RadzenButton Text="Add user" Icon="person_add" ButtonStyle="ButtonStyle.Primary" Click="@ShowAddModal" Disabled="@_isLoading" />
+                <RadzenButton Text='@L["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadUsersAsync" Disabled="@_isLoading" />
+                <RadzenButton Text='@L["Add user"]' Icon="person_add" ButtonStyle="ButtonStyle.Primary" Click="@ShowAddModal" Disabled="@_isLoading" />
             </RadzenStack>
         </RadzenColumn>
     </RadzenRow>
@@ -29,21 +30,21 @@
     else
     {
         <RadzenDataGrid TItem="MysqlUserModel" Data="@_users" AllowPaging="true" AllowSorting="true"
-                        AllowFiltering="true" PageSize="20" EmptyText="No MySQL users found.">
+                        AllowFiltering="true" PageSize="20" EmptyText='@L["No MySQL users found."]'>
             <Columns>
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Username)" Title="Username" />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Active)" Title="Active" />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.DefaultHostgroup)" Title="Default HG" />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.DefaultSchema)" Title="Default schema" />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Backend)" Title="Backend" />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Frontend)" Title="Frontend" />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.MaxConnections)" Title="Max connections" />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Comment)" Title="Comment" />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Title="Actions" Filterable="false" Sortable="false" Width="190px">
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Username)" Title='@L["Username"]' />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Active)" Title='@L["Active"]' />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.DefaultHostgroup)" Title='@L["Default HG"]' />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.DefaultSchema)" Title='@L["Default schema"]' />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Backend)" Title='@L["Backend"]' />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Frontend)" Title='@L["Frontend"]' />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.MaxConnections)" Title='@L["Max connections"]' />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Comment)" Title='@L["Comment"]' />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Title='@L["Actions"]' Filterable="false" Sortable="false" Width="190px">
                     <Template Context="user">
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                            <RadzenButton Text="Edit" Icon="edit" Size="ButtonSize.Small" Click="@(() => ShowEditModal(user))" />
-                            <RadzenButton Text="Delete" Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
+                            <RadzenButton Text='@L["Edit"]' Icon="edit" Size="ButtonSize.Small" Click="@(() => ShowEditModal(user))" />
+                            <RadzenButton Text='@L["Delete"]' Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
                                           Click="@(() => ShowDeleteModal(user))" />
                         </RadzenStack>
                     </Template>
@@ -68,7 +69,7 @@
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Failed to load users", ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, L["Failed to load users"], ex.Message);
         }
         finally
         {
@@ -79,7 +80,7 @@
     private async Task ShowAddModal()
     {
         var changed = await DialogService.OpenAsync<EditMysqlUserDialog>(
-            "Add MySQL user",
+            L["Add MySQL user"],
             options: GetDialogOptions());
         if (changed is true) await LoadUsersAsync();
     }
@@ -87,7 +88,7 @@
     private async Task ShowEditModal(MysqlUserModel user)
     {
         var changed = await DialogService.OpenAsync<EditMysqlUserDialog>(
-            $"Edit {user.Username}",
+            $"{L["Edit"]} {user.Username}",
             new Dictionary<string, object?>
             {
                 [nameof(EditMysqlUserDialog.Username)] = user.Username,
@@ -100,7 +101,7 @@
     private async Task ShowDeleteModal(MysqlUserModel user)
     {
         var changed = await DialogService.OpenAsync<DeleteMysqlUserDialog>(
-            $"Delete {user.Username}",
+            $"{L["Delete"]} {user.Username}",
             new Dictionary<string, object?>
             {
                 [nameof(DeleteMysqlUserDialog.Username)] = user.Username,
