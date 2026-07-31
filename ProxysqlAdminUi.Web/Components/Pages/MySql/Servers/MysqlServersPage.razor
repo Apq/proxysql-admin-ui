@@ -1,50 +1,134 @@
 ﻿@page "/mysql/servers"
 
-
 @using ProxysqlAdminUi.Web.Models
 @using ProxysqlAdminUi.Web.Repositories
 
 @attribute [Authorize]
 
 @inject ProxySqlRepository ProxySqlRepository
+@inject DialogService DialogService
+@inject NotificationService NotificationService
 
-<h3>MySQL Servers</h3>
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="6">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1">MySQL Servers</RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="6">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadServersAsync" Disabled="@_isLoading" />
+                <RadzenButton Text="Add server" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@ShowAddModal" Disabled="@_isLoading" />
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
 
-<RadzenDataGrid TItem="MysqlServerModel" Data="@MySqlServers" AllowPaging="true" PageSize="10">
-    <Columns>
-        <RadzenDataGridColumn Property="@nameof(MysqlServerModel.HostgroupId)" Title="Host Group ID" />
-        <RadzenDataGridColumn Property="@nameof(MysqlServerModel.Hostname)" Title="Hostname" />
-        <RadzenDataGridColumn Property="@nameof(MysqlServerModel.Port)" Title="Port" />
-        <RadzenDataGridColumn>
-            <Template>
-                <RadzenButton Text="Edit" Click="@ShowEditModal" Icon="Edit" />
-                <RadzenButton Text="Delete" Click="@ShowDeleteModal" Icon="Delete" />
-            </Template>
-        </RadzenDataGridColumn>
-    </Columns>
-</RadzenDataGrid>
+    @if (_isLoading)
+    {
+        <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+    }
+    else
+    {
+        <RadzenDataGrid TItem="MysqlServerModel" Data="@_servers" AllowPaging="true" AllowSorting="true"
+                        AllowFiltering="true" PageSize="20" EmptyText="No MySQL servers found.">
+            <Columns>
+                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.HostgroupId)" Title="Hostgroup" />
+                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Hostname)" Title="Hostname" />
+                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Port)" Title="Port" />
+                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Status)" Title="Status" />
+                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Weight)" Title="Weight" />
+                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.MaxConnections)" Title="Max connections" />
+                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.MaxReplicationLag)" Title="Max replication lag" />
+                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Comment)" Title="Comment" />
+                <RadzenDataGridColumn TItem="MysqlServerModel" Title="Actions" Filterable="false" Sortable="false" Width="190px">
+                    <Template Context="server">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Text="Edit" Icon="edit" Size="ButtonSize.Small"
+                                          Click="@(() => ShowEditModal(server))" />
+                            <RadzenButton Text="Delete" Icon="delete" Size="ButtonSize.Small"
+                                          ButtonStyle="ButtonStyle.Danger"
+                                          Click="@(() => ShowDeleteModal(server))" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    }
+</RadzenStack>
 
 @code {
-    private List<MysqlServerModel> MySqlServers { get; set; } = new();
+    private List<MysqlServerModel> _servers = [];
+    private bool _isLoading;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadServersAsync();
+
+    private async Task LoadServersAsync()
     {
-        MySqlServers = (await GetMySqlServersAsync()).ToList();
+        _isLoading = true;
+        try
+        {
+            _servers = (await ProxySqlRepository.GetMySqlServers()).ToList();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Failed to load servers", ex.Message);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
-    private async Task<IEnumerable<MysqlServerModel>> GetMySqlServersAsync()
+    private async Task ShowAddModal()
     {
-        return await ProxySqlRepository.GetMySqlServers();
+        var changed = await DialogService.OpenAsync<EditMysqlServerDialog>(
+            "Add MySQL server",
+            options: GetDialogOptions());
+
+        if (changed is true)
+        {
+            await LoadServersAsync();
+        }
     }
 
-    private void ShowEditModal()
+    private async Task ShowEditModal(MysqlServerModel server)
     {
-        // Implement edit functionality using the selected MySQL server.
+        var changed = await DialogService.OpenAsync<EditMysqlServerDialog>(
+            $"Edit {server.Hostname}:{server.Port} in HG {server.HostgroupId}",
+            new Dictionary<string, object?>
+            {
+                [nameof(EditMysqlServerDialog.HostgroupId)] = server.HostgroupId,
+                [nameof(EditMysqlServerDialog.Hostname)] = server.Hostname,
+                [nameof(EditMysqlServerDialog.Port)] = server.Port
+            },
+            GetDialogOptions());
+
+        if (changed is true)
+        {
+            await LoadServersAsync();
+        }
     }
 
-    private void ShowDeleteModal()
+    private async Task ShowDeleteModal(MysqlServerModel server)
     {
-        // Implement delete functionality using the selected MySQL server.
+        var changed = await DialogService.OpenAsync<DeleteMysqlServerDialog>(
+            $"Delete {server.Hostname}:{server.Port} from HG {server.HostgroupId}",
+            new Dictionary<string, object?>
+            {
+                [nameof(DeleteMysqlServerDialog.HostgroupId)] = server.HostgroupId,
+                [nameof(DeleteMysqlServerDialog.Hostname)] = server.Hostname,
+                [nameof(DeleteMysqlServerDialog.Port)] = server.Port
+            },
+            new DialogOptions { CloseDialogOnEsc = true, Width = "560px" });
+
+        if (changed is true)
+        {
+            await LoadServersAsync();
+        }
     }
+
+    private static DialogOptions GetDialogOptions() => new()
+    {
+        CloseDialogOnEsc = true,
+        Width = "900px"
+    };
 }
-

@@ -349,3 +349,11 @@ healthchecksdb
 MigrationBackup/
 
 ProxysqlAdminUi.Web/db/
+
+# Windows in-place deployment outputs and local service configuration
+publish/
+publish.staging/
+data/
+logs/
+scripts/windows/ProxySQL-Admin-UI.xml
+scripts/windows/ProxySQL-Admin-UI.exe

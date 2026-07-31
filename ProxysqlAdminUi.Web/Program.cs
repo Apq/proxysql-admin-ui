@@ -58,7 +58,7 @@ builder.Services.AddIdentityCore<ProxysqlAdminUiWebUser>(options =>
 builder.SetupIdentityDbContext();
 
 var proxySqlConnectionString = builder.Configuration.GetConnectionString("ProxySqlContext") ?? throw new InvalidOperationException("Connection string 'ProxySqlContext' not found.");
-builder.Services.AddDbContext<ProxySqlContext>(options =>
+builder.Services.AddDbContextFactory<ProxySqlContext>(options =>
     options.UseMySQL(proxySqlConnectionString));
 
 builder.Services.AddScoped<ProxySqlRepository>();
@@ -98,6 +98,9 @@ app.UseOutputCache();
 
 app.UseSwagger();
 app.UseSwaggerUI();
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
+    .AllowAnonymous();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

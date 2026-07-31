@@ -25,11 +25,15 @@ A modern web interface for managing ProxySQL, built with Blazor and .NET Core.
 
 - Dashboard with metrics
 - ProxySQL management:
-  - Mysql backend server configuration
-  - Mysql Users configuration
+  - MySQL backend server add, edit, and delete operations
+  - MySQL user add, edit, and delete operations
+  - Automatic `LOAD ... TO RUNTIME` and `SAVE ... TO DISK` after server and user changes
   - Query rules configuration
   - Query digest grid with stats and filters
   - Global variables configuration
+
+> [!CAUTION]
+> This application can change live ProxySQL routing and authentication. Restrict network access, use a dedicated ProxySQL admin account, and verify backups and rollback procedures before using write operations in production.
 
 ## Tech Stack
 
@@ -69,6 +73,10 @@ A modern web interface for managing ProxySQL, built with Blazor and .NET Core.
 ```bash
 dotnet watch --project ProxysqlAdminUi.Web/ProxysqlAdminUi.Web.csproj
 ```
+
+#### Windows Service Deployment
+
+Windows in-place publishing and WinSW service management scripts are available in [`scripts/windows`](scripts/windows/就地部署.md). Published application files, identity data, logs, the downloaded WinSW executable, and the local service XML are kept outside version control. Repeated deployments replace only the application publish directory and preserve `data/db/app.db`.
 
 #### Docker Configuration
 

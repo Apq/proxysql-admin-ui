@@ -1,0 +1,83 @@
+﻿@using ProxysqlAdminUi.Web.Models
+@using ProxysqlAdminUi.Web.Repositories
+
+@attribute [Authorize]
+
+@inject ProxySqlRepository ProxySqlRepository
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+@if (_isLoading)
+{
+    <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+}
+else if (_user is not null)
+{
+    <RadzenStack Gap="1rem">
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" Variant="Variant.Flat">
+            This removes the user from ProxySQL, loads the new user configuration to Runtime, and saves it to Disk.
+        </RadzenAlert>
+        <RadzenCard>
+            <RadzenStack Gap="0.5rem">
+                <RadzenText><strong>Username:</strong> @_user.Username</RadzenText>
+                <RadzenText><strong>Backend:</strong> @_user.Backend</RadzenText>
+                <RadzenText><strong>Frontend:</strong> @_user.Frontend</RadzenText>
+                <RadzenText><strong>Default hostgroup:</strong> @_user.DefaultHostgroup</RadzenText>
+            </RadzenStack>
+        </RadzenCard>
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.75rem">
+            <RadzenButton Text="Cancel" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@Cancel" Disabled="@_isDeleting" />
+            <RadzenButton Text="Delete, load & persist" Icon="delete" ButtonStyle="ButtonStyle.Danger"
+                          Click="@DeleteAsync" IsBusy="@_isDeleting" Disabled="@_isDeleting" />
+        </RadzenStack>
+    </RadzenStack>
+}
+
+@code {
+    [Parameter] public string Username { get; set; } = string.Empty;
+    [Parameter] public int Backend { get; set; }
+
+    private MysqlUserModel? _user;
+    private bool _isLoading = true;
+    private bool _isDeleting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _user = await ProxySqlRepository.GetMySqlUser(Username, Backend)
+                ?? throw new InvalidOperationException("The selected MySQL user was not found.");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Failed to load user", ex.Message);
+            DialogService.Close(false);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        _isDeleting = true;
+        try
+        {
+            await ProxySqlRepository.DeleteMySqlUser(Username, Backend);
+            NotificationService.Notify(NotificationSeverity.Success, "User deleted",
+                "The change is active in Runtime and saved to Disk.");
+            DialogService.Close(true);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Failed to delete user", ex.Message);
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+
+    private void Cancel() => DialogService.Close(false);
+}

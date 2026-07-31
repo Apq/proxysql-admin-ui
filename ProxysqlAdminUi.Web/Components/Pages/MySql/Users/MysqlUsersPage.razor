@@ -6,45 +6,113 @@
 @attribute [Authorize]
 
 @inject ProxySqlRepository ProxySqlRepository
+@inject DialogService DialogService
+@inject NotificationService NotificationService
 
-<h3>Users</h3>
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="6">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1">MySQL Users</RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="6">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadUsersAsync" Disabled="@_isLoading" />
+                <RadzenButton Text="Add user" Icon="person_add" ButtonStyle="ButtonStyle.Primary" Click="@ShowAddModal" Disabled="@_isLoading" />
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
 
-<RadzenDataGrid TItem="MysqlUserModel" Data="@MySqlUsersList" AllowPaging="true" PageSize="10">
-    <Columns>
-        <RadzenDataGridColumn Property="@nameof(MysqlUserModel.Username)" Title="Username" />
-        <RadzenDataGridColumn Property="@nameof(MysqlUserModel.DefaultHostgroup)" Title="Default Hostgroup" />
-        <RadzenDataGridColumn>
-            <Template>
-                <RadzenButton Click="@ShowEditModal" Text="Edit" Icon="Edit"></RadzenButton>
-                <RadzenButton Click="@ShowDeleteModal" Text="Delete" Icon="Delete"></RadzenButton>
-            </Template>
-        </RadzenDataGridColumn>
-    </Columns>
-</RadzenDataGrid>
-
+    @if (_isLoading)
+    {
+        <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+    }
+    else
+    {
+        <RadzenDataGrid TItem="MysqlUserModel" Data="@_users" AllowPaging="true" AllowSorting="true"
+                        AllowFiltering="true" PageSize="20" EmptyText="No MySQL users found.">
+            <Columns>
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Username)" Title="Username" />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Active)" Title="Active" />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.DefaultHostgroup)" Title="Default HG" />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.DefaultSchema)" Title="Default schema" />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Backend)" Title="Backend" />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Frontend)" Title="Frontend" />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.MaxConnections)" Title="Max connections" />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Comment)" Title="Comment" />
+                <RadzenDataGridColumn TItem="MysqlUserModel" Title="Actions" Filterable="false" Sortable="false" Width="190px">
+                    <Template Context="user">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Text="Edit" Icon="edit" Size="ButtonSize.Small" Click="@(() => ShowEditModal(user))" />
+                            <RadzenButton Text="Delete" Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
+                                          Click="@(() => ShowDeleteModal(user))" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    }
+</RadzenStack>
 
 @code {
+    private List<MysqlUserModel> _users = [];
+    private bool _isLoading;
 
-    private List<MysqlUserModel> MySqlUsersList { get; set; } = new();
+    protected override Task OnInitializedAsync() => LoadUsersAsync();
 
-    protected override async Task OnInitializedAsync()
+    private async Task LoadUsersAsync()
     {
-        MySqlUsersList = (await GetMySqlUsersAsync()).ToList();
-        StateHasChanged();
+        _isLoading = true;
+        try
+        {
+            _users = (await ProxySqlRepository.GetMySqlUsers()).ToList();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Failed to load users", ex.Message);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
-    private async Task<IEnumerable<MysqlUserModel>> GetMySqlUsersAsync()
+    private async Task ShowAddModal()
     {
-        return await ProxySqlRepository.GetMySqlUsers();
+        var changed = await DialogService.OpenAsync<EditMysqlUserDialog>(
+            "Add MySQL user",
+            options: GetDialogOptions());
+        if (changed is true) await LoadUsersAsync();
     }
 
-    private void ShowEditModal()
+    private async Task ShowEditModal(MysqlUserModel user)
     {
-        // Implement edit functionality using the selected MySQL user.
+        var changed = await DialogService.OpenAsync<EditMysqlUserDialog>(
+            $"Edit {user.Username}",
+            new Dictionary<string, object?>
+            {
+                [nameof(EditMysqlUserDialog.Username)] = user.Username,
+                [nameof(EditMysqlUserDialog.Backend)] = user.Backend
+            },
+            GetDialogOptions());
+        if (changed is true) await LoadUsersAsync();
     }
 
-    private void ShowDeleteModal()
+    private async Task ShowDeleteModal(MysqlUserModel user)
     {
-        // Implement delete functionality using the selected MySQL user.
+        var changed = await DialogService.OpenAsync<DeleteMysqlUserDialog>(
+            $"Delete {user.Username}",
+            new Dictionary<string, object?>
+            {
+                [nameof(DeleteMysqlUserDialog.Username)] = user.Username,
+                [nameof(DeleteMysqlUserDialog.Backend)] = user.Backend
+            },
+            new DialogOptions { CloseDialogOnEsc = true, Width = "560px" });
+        if (changed is true) await LoadUsersAsync();
     }
+
+    private static DialogOptions GetDialogOptions() => new()
+    {
+        CloseDialogOnEsc = true,
+        Width = "900px"
+    };
 }

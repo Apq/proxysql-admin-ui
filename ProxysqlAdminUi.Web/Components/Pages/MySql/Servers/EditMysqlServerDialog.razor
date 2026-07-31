@@ -1,0 +1,176 @@
+﻿@using ProxysqlAdminUi.Web.Models
+@using ProxysqlAdminUi.Web.Repositories
+
+@attribute [Authorize]
+
+@inject ProxySqlRepository ProxySqlRepository
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+@if (_isLoading)
+{
+    <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+}
+else
+{
+    <RadzenTemplateForm TItem="MysqlServerModel" Data="@_server" Submit="@SaveAsync">
+        <DataAnnotationsValidator />
+        <RadzenStack Gap="1rem">
+            <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" Variant="Variant.Flat">
+                Saving updates the ProxySQL memory table, loads MySQL servers to Runtime, and saves them to Disk.
+            </RadzenAlert>
+
+            <RadzenRow>
+                <RadzenColumn Size="4">
+                    <RadzenFormField Text="Hostgroup" Variant="Variant.Outlined">
+                        <RadzenNumeric @bind-Value="_server.HostgroupId" Name="HostgroupId" Min="0" Style="width: 100%" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="5">
+                    <RadzenFormField Text="Hostname" Variant="Variant.Outlined">
+                        <RadzenTextBox @bind-Value="_server.Hostname" Name="Hostname" Style="width: 100%" />
+                    </RadzenFormField>
+                    <RadzenRequiredValidator Component="Hostname" Text="Hostname is required" Popup="true" />
+                </RadzenColumn>
+                <RadzenColumn Size="3">
+                    <RadzenFormField Text="Port" Variant="Variant.Outlined">
+                        <RadzenNumeric @bind-Value="_server.Port" Name="Port" Min="1" Max="65535" Style="width: 100%" />
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenRow>
+                <RadzenColumn Size="4">
+                    <RadzenFormField Text="Status" Variant="Variant.Outlined">
+                        <RadzenDropDown @bind-Value="_server.Status" Data="@_statuses" Name="Status" Style="width: 100%" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="4">
+                    <RadzenFormField Text="Weight" Variant="Variant.Outlined">
+                        <RadzenNumeric @bind-Value="_server.Weight" Name="Weight" Min="0" Max="10000000" Style="width: 100%" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="4">
+                    <RadzenFormField Text="GTID port" Variant="Variant.Outlined">
+                        <RadzenNumeric @bind-Value="_server.GtidPort" Name="GtidPort" Min="0" Max="65535" Style="width: 100%" />
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenRow>
+                <RadzenColumn Size="4">
+                    <RadzenFormField Text="Max connections" Variant="Variant.Outlined">
+                        <RadzenNumeric @bind-Value="_server.MaxConnections" Name="MaxConnections" Min="0" Style="width: 100%" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="4">
+                    <RadzenFormField Text="Max replication lag" Variant="Variant.Outlined">
+                        <RadzenNumeric @bind-Value="_server.MaxReplicationLag" Name="MaxReplicationLag" Min="0" Style="width: 100%" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="4">
+                    <RadzenFormField Text="Max latency (ms)" Variant="Variant.Outlined">
+                        <RadzenNumeric @bind-Value="_server.MaxLatencyMs" Name="MaxLatencyMs" Min="0" Style="width: 100%" />
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenRow>
+                <RadzenColumn Size="4">
+                    <RadzenFormField Text="Use SSL" Variant="Variant.Outlined">
+                        <RadzenDropDown @bind-Value="_server.UseSsl" Data="@_binaryOptions" TextProperty="Text" ValueProperty="Value"
+                                        Name="UseSsl" Style="width: 100%" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="4">
+                    <RadzenFormField Text="Compression" Variant="Variant.Outlined">
+                        <RadzenDropDown @bind-Value="_server.Compression" Data="@_binaryOptions" TextProperty="Text" ValueProperty="Value"
+                                        Name="Compression" Style="width: 100%" />
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="4">
+                    <RadzenFormField Text="Comment" Variant="Variant.Outlined">
+                        <RadzenTextBox @bind-Value="_server.Comment" Name="Comment" Style="width: 100%" />
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.75rem">
+                <RadzenButton Text="Cancel" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@Cancel" Disabled="@_isSaving" />
+                <RadzenButton Text="Save, load & persist" Icon="save" ButtonType="ButtonType.Submit"
+                              ButtonStyle="ButtonStyle.Primary" IsBusy="@_isSaving" Disabled="@_isSaving" />
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenTemplateForm>
+}
+
+@code {
+    [Parameter] public int? HostgroupId { get; set; }
+    [Parameter] public string? Hostname { get; set; }
+    [Parameter] public int? Port { get; set; }
+
+    private readonly string[] _statuses = ["ONLINE", "SHUNNED", "OFFLINE_SOFT", "OFFLINE_HARD"];
+    private readonly BinaryOption[] _binaryOptions = [new("No", 0), new("Yes", 1)];
+    private MysqlServerModel _server = new();
+    private bool _isLoading;
+    private bool _isSaving;
+    private bool IsEdit => HostgroupId.HasValue && !string.IsNullOrWhiteSpace(Hostname) && Port.HasValue;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsEdit)
+        {
+            return;
+        }
+
+        _isLoading = true;
+        try
+        {
+            _server = await ProxySqlRepository.GetMySqlServer(HostgroupId!.Value, Hostname!, Port!.Value)
+                ?? throw new InvalidOperationException("The selected MySQL server was not found.");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Failed to load server", ex.Message);
+            DialogService.Close(false);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _isSaving = true;
+        try
+        {
+            if (IsEdit)
+            {
+                await ProxySqlRepository.UpdateMySqlServer(HostgroupId!.Value, Hostname!, Port!.Value, _server);
+            }
+            else
+            {
+                await ProxySqlRepository.AddMySqlServer(_server);
+            }
+
+            NotificationService.Notify(
+                NotificationSeverity.Success,
+                IsEdit ? "Server updated" : "Server added",
+                "The change is active in Runtime and saved to Disk.");
+            DialogService.Close(true);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Failed to save server", ex.Message);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void Cancel() => DialogService.Close(false);
+
+    private sealed record BinaryOption(string Text, int Value);
+}
