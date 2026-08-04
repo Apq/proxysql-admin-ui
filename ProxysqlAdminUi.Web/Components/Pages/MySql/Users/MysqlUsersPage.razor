@@ -1,4 +1,4 @@
-﻿@page "/mysql/users"
+@page "/mysql/users"
 
 @using ProxysqlAdminUi.Web.Models
 @using ProxysqlAdminUi.Web.Repositories
@@ -17,64 +17,144 @@
         </RadzenColumn>
         <RadzenColumn Size="6">
             <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
-                <RadzenButton Text='@L["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadUsersAsync" Disabled="@_isLoading" />
-                <RadzenButton Text='@L["Add user"]' Icon="person_add" ButtonStyle="ButtonStyle.Primary" Click="@ShowAddModal" Disabled="@_isLoading" />
+                <RadzenButton Text='@L["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light"
+                              Click="@RefreshCurrentLayerAsync" Disabled="@IsCurrentLayerLoading" />
+                @if (CurrentLayer == ProxySqlConfigLayer.Main)
+                {
+                    <RadzenButton Text='@L["Add user"]' Icon="person_add" ButtonStyle="ButtonStyle.Primary"
+                                  Click="@ShowAddModal" Disabled="@IsCurrentLayerLoading" />
+                }
             </RadzenStack>
         </RadzenColumn>
     </RadzenRow>
 
-    @if (_isLoading)
-    {
-        <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
-    }
-    else
-    {
-        <RadzenDataGrid TItem="MysqlUserModel" Data="@_users" AllowPaging="true" AllowSorting="true"
-                        AllowFiltering="true" PageSize="20" EmptyText='@L["No MySQL users found."]'>
-            <Columns>
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Username)" Title='@L["Username"]' />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Active)" Title='@L["Active"]' />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.DefaultHostgroup)" Title='@L["Default HG"]' />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.DefaultSchema)" Title='@L["Default schema"]' />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Backend)" Title='@L["Backend"]' />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Frontend)" Title='@L["Frontend"]' />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.MaxConnections)" Title='@L["Max connections"]' />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Comment)" Title='@L["Comment"]' />
-                <RadzenDataGridColumn TItem="MysqlUserModel" Title='@L["Actions"]' Filterable="false" Sortable="false" Width="190px">
-                    <Template Context="user">
-                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                            <RadzenButton Text='@L["Edit"]' Icon="edit" Size="ButtonSize.Small" Click="@(() => ShowEditModal(user))" />
-                            <RadzenButton Text='@L["Delete"]' Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
-                                          Click="@(() => ShowDeleteModal(user))" />
-                        </RadzenStack>
-                    </Template>
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
-    }
+    <RadzenTabs @bind-SelectedIndex="_selectedLayerIndex" Change="@OnLayerChangedAsync">
+        <Tabs>
+            @foreach (var layer in ConfigLayers)
+            {
+                <RadzenTabsItem @key="layer" Text="@GetLayerLabel(layer)">
+                    <RadzenStack Gap="0.75rem" class="rz-pt-3">
+                        <RadzenRow AlignItems="AlignItems.Center">
+                            <RadzenColumn Size="8">
+                                <RadzenText TextStyle="TextStyle.Body2">
+                                    @L["Data source"]: <code>@ProxySqlRepository.GetConfigTableName(layer, ProxySqlConfigTable.MysqlUsers)</code>
+                                </RadzenText>
+                            </RadzenColumn>
+                            @if (layer != ProxySqlConfigLayer.Main)
+                            {
+                                <RadzenColumn Size="4">
+                                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.25rem">
+                                        <RadzenIcon Icon="lock" />
+                                        <RadzenText TextStyle="TextStyle.Body2">@L["This layer is read-only."]</RadzenText>
+                                    </RadzenStack>
+                                </RadzenColumn>
+                            }
+                        </RadzenRow>
+
+                        @if (_loadingLayers.Contains(layer))
+                        {
+                            <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+                        }
+                        else
+                        {
+                            <RadzenDataGrid TItem="MysqlUserModel" Data="@GetUsers(layer)" AllowPaging="true"
+                                            AllowSorting="true" AllowFiltering="true" PageSize="20"
+                                            EmptyText='@L["No MySQL users found."]'>
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Username)" Title='@L["Username"]' />
+                                    <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Active)" Title='@L["Active"]' />
+                                    <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.DefaultHostgroup)" Title='@L["Default HG"]' />
+                                    <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.DefaultSchema)" Title='@L["Default schema"]' />
+                                    <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Backend)" Title='@L["Backend"]' />
+                                    <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Frontend)" Title='@L["Frontend"]' />
+                                    <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.MaxConnections)" Title='@L["Max connections"]' />
+                                    <RadzenDataGridColumn TItem="MysqlUserModel" Property="@nameof(MysqlUserModel.Comment)" Title='@L["Comment"]' />
+                                    @if (layer == ProxySqlConfigLayer.Main)
+                                    {
+                                        <RadzenDataGridColumn TItem="MysqlUserModel" Title='@L["Actions"]' Filterable="false" Sortable="false" Width="190px">
+                                            <Template Context="user">
+                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                                    <RadzenButton Text='@L["Edit"]' Icon="edit" Size="ButtonSize.Small"
+                                                                  Click="@(() => ShowEditModal(user))" />
+                                                    <RadzenButton Text='@L["Delete"]' Icon="delete" Size="ButtonSize.Small"
+                                                                  ButtonStyle="ButtonStyle.Danger"
+                                                                  Click="@(() => ShowDeleteModal(user))" />
+                                                </RadzenStack>
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                    }
+                                </Columns>
+                            </RadzenDataGrid>
+                        }
+                    </RadzenStack>
+                </RadzenTabsItem>
+            }
+        </Tabs>
+    </RadzenTabs>
 </RadzenStack>
 
 @code {
-    private List<MysqlUserModel> _users = [];
-    private bool _isLoading;
+    private static readonly ProxySqlConfigLayer[] ConfigLayers = Enum.GetValues<ProxySqlConfigLayer>();
+    private readonly Dictionary<ProxySqlConfigLayer, List<MysqlUserModel>> _usersByLayer = [];
+    private readonly HashSet<ProxySqlConfigLayer> _loadedLayers = [];
+    private readonly HashSet<ProxySqlConfigLayer> _loadingLayers = [];
+    private int _selectedLayerIndex;
 
-    protected override Task OnInitializedAsync() => LoadUsersAsync();
+    private ProxySqlConfigLayer CurrentLayer => ConfigLayers[_selectedLayerIndex];
+    private bool IsCurrentLayerLoading => _loadingLayers.Contains(CurrentLayer);
 
-    private async Task LoadUsersAsync()
+    protected override Task OnInitializedAsync() => LoadLayerAsync(ProxySqlConfigLayer.Main);
+
+    private async Task OnLayerChangedAsync(int index)
     {
-        _isLoading = true;
+        _selectedLayerIndex = index;
+        await LoadLayerAsync(CurrentLayer);
+    }
+
+    private Task RefreshCurrentLayerAsync() => LoadLayerAsync(CurrentLayer, force: true);
+
+    private async Task LoadLayerAsync(ProxySqlConfigLayer layer, bool force = false)
+    {
+        if (!force && _loadedLayers.Contains(layer))
+        {
+            return;
+        }
+
+        _loadingLayers.Add(layer);
         try
         {
-            _users = (await ProxySqlRepository.GetMySqlUsers()).ToList();
+            _usersByLayer[layer] = (await ProxySqlRepository.GetMySqlUsers(layer)).ToList();
+            _loadedLayers.Add(layer);
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, L["Failed to load users"], ex.Message);
+            NotificationService.Notify(
+                NotificationSeverity.Error,
+                L["Failed to load users"],
+                $"{GetLayerLabel(layer)}: {ex.Message}");
         }
         finally
         {
-            _isLoading = false;
+            _loadingLayers.Remove(layer);
         }
+    }
+
+    private IReadOnlyList<MysqlUserModel> GetUsers(ProxySqlConfigLayer layer)
+        => _usersByLayer.GetValueOrDefault(layer) ?? [];
+
+    private string GetLayerLabel(ProxySqlConfigLayer layer) => layer switch
+    {
+        ProxySqlConfigLayer.Main => L["Main (editable)"],
+        ProxySqlConfigLayer.Runtime => L["Runtime (read-only)"],
+        ProxySqlConfigLayer.Disk => L["Disk (read-only)"],
+        _ => layer.ToString()
+    };
+
+    private async Task ReloadAfterMutationAsync()
+    {
+        _loadedLayers.Remove(ProxySqlConfigLayer.Runtime);
+        _loadedLayers.Remove(ProxySqlConfigLayer.Disk);
+        await LoadLayerAsync(ProxySqlConfigLayer.Main, force: true);
     }
 
     private async Task ShowAddModal()
@@ -82,7 +162,11 @@
         var changed = await DialogService.OpenAsync<EditMysqlUserDialog>(
             L["Add MySQL user"],
             options: GetDialogOptions());
-        if (changed is true) await LoadUsersAsync();
+
+        if (changed is true)
+        {
+            await ReloadAfterMutationAsync();
+        }
     }
 
     private async Task ShowEditModal(MysqlUserModel user)
@@ -95,7 +179,11 @@
                 [nameof(EditMysqlUserDialog.Backend)] = user.Backend
             },
             GetDialogOptions());
-        if (changed is true) await LoadUsersAsync();
+
+        if (changed is true)
+        {
+            await ReloadAfterMutationAsync();
+        }
     }
 
     private async Task ShowDeleteModal(MysqlUserModel user)
@@ -108,7 +196,11 @@
                 [nameof(DeleteMysqlUserDialog.Backend)] = user.Backend
             },
             new DialogOptions { CloseDialogOnEsc = true, Width = "560px" });
-        if (changed is true) await LoadUsersAsync();
+
+        if (changed is true)
+        {
+            await ReloadAfterMutationAsync();
+        }
     }
 
     private static DialogOptions GetDialogOptions() => new()

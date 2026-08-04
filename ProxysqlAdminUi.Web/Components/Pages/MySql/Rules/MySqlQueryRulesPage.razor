@@ -1,5 +1,6 @@
-﻿@page "/mysql/rules"
+@page "/mysql/rules"
 
+@using ProxysqlAdminUi.Web.Models
 @using ProxysqlAdminUi.Web.Repositories
 @using ProxysqlAdminUi.Web.ViewModel
 
@@ -7,209 +8,304 @@
 
 @inject ProxySqlRepository ProxySqlRepository
 @inject DialogService DialogService
+@inject NotificationService NotificationService
 @inject LocalizationService L
 
-<RadzenRow AlignItems="AlignItems.Normal" Gap="">
-    <RadzenColumn Order="1" Size="3">
-        <RadzenText Text='@L["Query Rules"]' TextStyle="TextStyle.DisplayH3" TextAlign="TextAlign.Left" />
-    </RadzenColumn>
-    <RadzenColumn Order="10" Size="3" Offset="6">
-        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem">
-            <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Text='@L["Refresh"]' Click="RefreshRules" />
-            <RadzenButton Icon="add" ButtonStyle="ButtonStyle.Primary" Text='@L["Add rule"]' Click="CreateNewQueryRule" />
-        </RadzenStack>
-    </RadzenColumn>
-</RadzenRow>
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="6">
+            <RadzenText Text='@L["Query Rules"]' TextStyle="TextStyle.H3" TagName="TagName.H1" />
+        </RadzenColumn>
+        <RadzenColumn Size="6">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Text='@L["Refresh"]'
+                              Click="@RefreshCurrentLayerAsync" Disabled="@IsCurrentLayerLoading" />
+                @if (CurrentLayer == ProxySqlConfigLayer.Main)
+                {
+                    <RadzenButton Icon="add" ButtonStyle="ButtonStyle.Primary" Text='@L["Add rule"]'
+                                  Click="@CreateNewQueryRule" Disabled="@IsCurrentLayerLoading" />
+                }
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
 
-<RadzenStack AlignItems="AlignItems.Start" Orientation="Orientation.Vertical">
+    <RadzenTabs @bind-SelectedIndex="_selectedLayerIndex" Change="@OnLayerChangedAsync">
+        <Tabs>
+            @foreach (var layer in ConfigLayers)
+            {
+                <RadzenTabsItem @key="layer" Text="@GetLayerLabel(layer)">
+                    <RadzenStack Gap="0.75rem" class="rz-pt-3">
+                        <RadzenRow AlignItems="AlignItems.Center">
+                            <RadzenColumn Size="8">
+                                <RadzenText TextStyle="TextStyle.Body2">
+                                    @L["Data source"]: <code>@ProxySqlRepository.GetConfigTableName(layer, ProxySqlConfigTable.MysqlQueryRules)</code>
+                                </RadzenText>
+                            </RadzenColumn>
+                            @if (layer != ProxySqlConfigLayer.Main)
+                            {
+                                <RadzenColumn Size="4">
+                                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.25rem">
+                                        <RadzenIcon Icon="lock" />
+                                        <RadzenText TextStyle="TextStyle.Body2">@L["This layer is read-only."]</RadzenText>
+                                    </RadzenStack>
+                                </RadzenColumn>
+                            }
+                        </RadzenRow>
 
-    @foreach (var rule in MysqlQueryRulesList)
-    {
-        <RadzenCard class="rz-w-100">
-            <RadzenCardGroup Responsive="true">
-                <RadzenCard Variant="Variant.Text">
-                    <RadzenRow>
-                        <RadzenLabel>@L["Rule ID"]:</RadzenLabel> <RadzenText>@rule.RuleId</RadzenText>
-                    </RadzenRow>
-                    @if (rule.Comment != null)
-                    {
-                        <RadzenRow>
-                            <RadzenLabel>@L["Comment"]:</RadzenLabel> <RadzenText>@rule.Comment</RadzenText>
-                        </RadzenRow>
-                    }
-                    <RadzenRow>
-                        <RadzenLabel>@L["Apply"]:</RadzenLabel> <RadzenText>@rule.Apply</RadzenText>
-                    </RadzenRow>
-                    <RadzenRow>
-                        <RadzenLabel>@L["Active"]:</RadzenLabel> <RadzenText>@rule.Active</RadzenText>
-                    </RadzenRow>
-                    @if (rule.CacheTtl != null)
-                    {
-                        <RadzenRow>
-                            <RadzenLabel>@L["Cache TTL (ms)"]:</RadzenLabel> <RadzenText>@(rule.CacheTtl)</RadzenText>
-                        </RadzenRow>
-                    }
+                        @if (_loadingLayers.Contains(layer))
+                        {
+                            <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+                        }
+                        else if (GetRules(layer).Count == 0)
+                        {
+                            <RadzenText>@L["No query rules found."]</RadzenText>
+                        }
+                        else
+                        {
+                            @foreach (var rule in GetRules(layer))
+                            {
+                                <RadzenCard class="rz-w-100">
+                                    <RadzenCardGroup Responsive="true">
+                                        <RadzenCard Variant="Variant.Text">
+                                            <RadzenRow>
+                                                <RadzenLabel>@L["Rule ID"]:</RadzenLabel> <RadzenText>@rule.RuleId</RadzenText>
+                                            </RadzenRow>
+                                            @if (rule.Comment != null)
+                                            {
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Comment"]:</RadzenLabel> <RadzenText>@rule.Comment</RadzenText>
+                                                </RadzenRow>
+                                            }
+                                            <RadzenRow>
+                                                <RadzenLabel>@L["Apply"]:</RadzenLabel> <RadzenText>@rule.Apply</RadzenText>
+                                            </RadzenRow>
+                                            <RadzenRow>
+                                                <RadzenLabel>@L["Active"]:</RadzenLabel> <RadzenText>@rule.Active</RadzenText>
+                                            </RadzenRow>
+                                            @if (rule.CacheTtl != null)
+                                            {
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Cache TTL (ms)"]:</RadzenLabel> <RadzenText>@rule.CacheTtl</RadzenText>
+                                                </RadzenRow>
+                                            }
+                                            @if (rule.CacheEmptyResult != null)
+                                            {
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Cache Empty Results"]:</RadzenLabel> <RadzenText>@rule.CacheEmptyResult</RadzenText>
+                                                </RadzenRow>
+                                            }
+                                            @if (rule.Timeout != null)
+                                            {
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Timeout"]:</RadzenLabel> <RadzenText>@rule.Timeout</RadzenText>
+                                                </RadzenRow>
+                                            }
+                                            @if (rule.Log != null)
+                                            {
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Log"]:</RadzenLabel> <RadzenText>@rule.Log</RadzenText>
+                                                </RadzenRow>
+                                            }
+                                        </RadzenCard>
 
-                    @if (rule.CacheEmptyResult != null)
-                    {
-                        <RadzenRow>
-                            <RadzenLabel>@L["Cache Empty Results"]:</RadzenLabel> <RadzenText>@(rule.CacheEmptyResult)</RadzenText>
-                        </RadzenRow>
-                    }
-                    @if (rule.Timeout != null)
-                    {
-                        <RadzenRow>
-                            <RadzenLabel>@L["Timeout"]:</RadzenLabel> <RadzenText>@(rule.Timeout)</RadzenText>
-                        </RadzenRow>
-                    }
-                    @if (rule.Log != null)
-                    {
-                        <RadzenRow>
-                            <RadzenLabel>@L["Log"]:</RadzenLabel> <RadzenText>@(rule.Log)</RadzenText>
-                        </RadzenRow>
-                    }
-                </RadzenCard>
-                <RadzenCard Variant="Variant.Text">
-                    @if (rule.Username != null)
-                    {
-                        <RadzenRow>
-                            <RadzenLabel>@L["Username"]:</RadzenLabel> <RadzenText>@(rule.Username)</RadzenText>
-                        </RadzenRow>
-                    }
-                    @if (rule.Schemaname != null)
-                    {
-                        <RadzenRow>
-                            <RadzenLabel>@L["Schema Name"]:</RadzenLabel> <RadzenText>@(rule.Schemaname)</RadzenText>
-                        </RadzenRow>
-                    }
+                                        <RadzenCard Variant="Variant.Text">
+                                            @if (rule.Username != null)
+                                            {
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Username"]:</RadzenLabel> <RadzenText>@rule.Username</RadzenText>
+                                                </RadzenRow>
+                                            }
+                                            @if (rule.Schemaname != null)
+                                            {
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Schema Name"]:</RadzenLabel> <RadzenText>@rule.Schemaname</RadzenText>
+                                                </RadzenRow>
+                                            }
+                                            @if (rule.DestinationHostgroup != null)
+                                            {
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Destination host group"]:</RadzenLabel> <RadzenText>@rule.DestinationHostgroup</RadzenText>
+                                                </RadzenRow>
+                                            }
+                                            @if (rule.Digest != null)
+                                            {
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Digest"]:</RadzenLabel> <RadzenText>@rule.Digest</RadzenText>
+                                                </RadzenRow>
+                                                @if (layer == ProxySqlConfigLayer.Main && rule.DigestText != null)
+                                                {
+                                                    <RadzenRow>
+                                                        <RadzenLabel>@L["Digest Text"]:</RadzenLabel>
+                                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="@rule.DigestText" />
+                                                    </RadzenRow>
+                                                }
+                                            }
+                                            @if (rule.MatchDigest != null)
+                                            {
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Match Digest"]:</RadzenLabel> <RadzenText>@rule.MatchDigest</RadzenText>
+                                                </RadzenRow>
+                                            }
+                                            @if (rule.MatchPattern != null)
+                                            {
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Match Pattern"]:</RadzenLabel> <RadzenText>@rule.MatchPattern</RadzenText>
+                                                </RadzenRow>
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Negate Match Pattern"]:</RadzenLabel> <RadzenText>@rule.NegateMatchPattern</RadzenText>
+                                                </RadzenRow>
+                                            }
+                                            @if (rule.ReplacePattern != null)
+                                            {
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Replace Pattern"]:</RadzenLabel> <RadzenText>@rule.ReplacePattern</RadzenText>
+                                                </RadzenRow>
+                                            }
+                                        </RadzenCard>
 
-                    @if (rule.DestinationHostgroup != null)
-                    {
-                        <RadzenRow>
-                            <RadzenLabel>@L["Destination host group"]:</RadzenLabel> <RadzenText>@(rule.DestinationHostgroup)</RadzenText>
-                        </RadzenRow>
-                    }
-                    @if (rule.Digest != null)
-                    {
-                        <RadzenRow>
-                            <RadzenLabel>@L["Digest"]:</RadzenLabel> <RadzenText>@(rule.Digest)</RadzenText>
-                        </RadzenRow>
-                        <RadzenRow>
-                            <RadzenLabel>@L["Digest Text"]:</RadzenLabel> <RadzenText TextStyle="TextStyle.Subtitle1" Text="@(rule.DigestText)"></RadzenText>
-                        </RadzenRow>
-                    }
-                    @if (rule.MatchDigest != null)
-                    {
-                        <RadzenRow>
-                            <RadzenLabel>@L["Match Digest"]:</RadzenLabel> <RadzenText>@(rule.MatchDigest)</RadzenText>
-                        </RadzenRow>
-                    }
-
-                    @if (rule.MatchPattern != null)
-                    {
-                        <RadzenRow>
-                            <RadzenLabel>@L["Match Pattern"]:</RadzenLabel> <RadzenText>@(rule.MatchPattern)</RadzenText>
-                        </RadzenRow>
-                        <RadzenRow>
-                            <RadzenLabel>@L["Negate Match Pattern"]:</RadzenLabel> <RadzenText>@(rule.NegateMatchPattern)</RadzenText>
-                        </RadzenRow>
-                    }
-                    @if (rule.ReplacePattern != null)
-                    {
-                        <RadzenRow>
-                            <RadzenLabel>@L["Replace Pattern"]:</RadzenLabel> <RadzenText>@(rule.ReplacePattern)</RadzenText>
-                        </RadzenRow>
-                    }
-                </RadzenCard>
-                <RadzenCard Variant="Variant.Text">
-                    <RadzenRow>
-                        <RadzenLabel>@L["Processed Queries"]:</RadzenLabel> <RadzenText>@(rule.CountStar)</RadzenText>
-                    </RadzenRow>
-                    <RadzenRow>
-                        <RadzenLabel>@L["Cached Queries"]:</RadzenLabel> <RadzenText>@(rule.Hits)</RadzenText>
-                    </RadzenRow>
-                    <RadzenChart Style="width: 100%; max-width: 600px;">
-                        <RadzenPieSeries Data=@GetChartEntry(rule.RuleId) ValueProperty="Count" CategoryProperty="Type">
-                            <RadzenSeriesDataLabels Visible="true" />
-                        </RadzenPieSeries>
-                    </RadzenChart>
-                </RadzenCard>
-                <RadzenCard Variant="Variant.Text">
-                    <RadzenStack>
-                        <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Primary" Text='@L["Edit"]' Click="async () => await ShowEditModal(rule.RuleId)"></RadzenButton>
-                        <RadzenButton Icon="Report" ButtonStyle="ButtonStyle.Danger" Text='@L["Delete"]' Click="async () => await ShowDeleteModal(rule.RuleId)"></RadzenButton>
+                                        @if (layer == ProxySqlConfigLayer.Main)
+                                        {
+                                            <RadzenCard Variant="Variant.Text">
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Processed Queries"]:</RadzenLabel> <RadzenText>@rule.CountStar</RadzenText>
+                                                </RadzenRow>
+                                                <RadzenRow>
+                                                    <RadzenLabel>@L["Cached Queries"]:</RadzenLabel> <RadzenText>@rule.Hits</RadzenText>
+                                                </RadzenRow>
+                                                <RadzenChart Style="width: 100%; max-width: 600px;">
+                                                    <RadzenPieSeries Data="@GetChartEntry(layer, rule.RuleId)" ValueProperty="Count" CategoryProperty="Type">
+                                                        <RadzenSeriesDataLabels Visible="true" />
+                                                    </RadzenPieSeries>
+                                                </RadzenChart>
+                                            </RadzenCard>
+                                            <RadzenCard Variant="Variant.Text">
+                                                <RadzenStack>
+                                                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Primary" Text='@L["Edit"]'
+                                                                  Click="@(() => ShowEditModal(rule.RuleId))" />
+                                                    <RadzenButton Icon="report" ButtonStyle="ButtonStyle.Danger" Text='@L["Delete"]'
+                                                                  Click="@(() => ShowDeleteModal(rule.RuleId))" />
+                                                </RadzenStack>
+                                            </RadzenCard>
+                                        }
+                                    </RadzenCardGroup>
+                                </RadzenCard>
+                            }
+                        }
                     </RadzenStack>
-                </RadzenCard>
-            </RadzenCardGroup>
-        </RadzenCard>
-    }
+                </RadzenTabsItem>
+            }
+        </Tabs>
+    </RadzenTabs>
 </RadzenStack>
 
 @code {
-    private List<QueryRuleViewModel> MysqlQueryRulesList { get; set; } = new();
+    private static readonly ProxySqlConfigLayer[] ConfigLayers = Enum.GetValues<ProxySqlConfigLayer>();
+    private readonly Dictionary<ProxySqlConfigLayer, List<QueryRuleViewModel>> _rulesByLayer = [];
+    private readonly HashSet<ProxySqlConfigLayer> _loadedLayers = [];
+    private readonly HashSet<ProxySqlConfigLayer> _loadingLayers = [];
+    private int _selectedLayerIndex;
 
-    protected override async Task OnInitializedAsync()
+    private ProxySqlConfigLayer CurrentLayer => ConfigLayers[_selectedLayerIndex];
+    private bool IsCurrentLayerLoading => _loadingLayers.Contains(CurrentLayer);
+
+    protected override Task OnInitializedAsync() => LoadLayerAsync(ProxySqlConfigLayer.Main);
+
+    private async Task OnLayerChangedAsync(int index)
     {
-        MysqlQueryRulesList.Clear();
-        MysqlQueryRulesList = (await GetMySqlRulesAsync()).ToList();
+        _selectedLayerIndex = index;
+        await LoadLayerAsync(CurrentLayer);
     }
 
-    private IEnumerable<PieChartEntryViewModel> GetChartEntry(int ruleId)
-    {
-        var rule = MysqlQueryRulesList.Find(x => x.RuleId == ruleId);
+    private Task RefreshCurrentLayerAsync() => LoadLayerAsync(CurrentLayer, force: true);
 
-        if (rule is null)
+    private async Task LoadLayerAsync(ProxySqlConfigLayer layer, bool force = false)
+    {
+        if (!force && _loadedLayers.Contains(layer))
         {
-            return [];
+            return;
         }
 
-        return
-        [
-            new () { Type = "Processed", Count = rule.CountStar  },
-            new () { Type = "Cached", Count = rule.Hits  }
-        ];
-    }
-    private async Task<IEnumerable<QueryRuleViewModel>> GetMySqlRulesAsync()
-    {
-        return await ProxySqlRepository.GetQueryRulesWithStats();
+        _loadingLayers.Add(layer);
+        try
+        {
+            _rulesByLayer[layer] = (await ProxySqlRepository.GetQueryRulesWithStats(layer)).ToList();
+            _loadedLayers.Add(layer);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(
+                NotificationSeverity.Error,
+                L["Failed to load query rules"],
+                $"{GetLayerLabel(layer)}: {ex.Message}");
+        }
+        finally
+        {
+            _loadingLayers.Remove(layer);
+        }
     }
 
-    private async Task RefreshRules()
+    private IReadOnlyList<QueryRuleViewModel> GetRules(ProxySqlConfigLayer layer)
+        => _rulesByLayer.GetValueOrDefault(layer) ?? [];
+
+    private IEnumerable<PieChartEntryViewModel> GetChartEntry(ProxySqlConfigLayer layer, int ruleId)
     {
-        MysqlQueryRulesList = (await GetMySqlRulesAsync()).ToList();
-        StateHasChanged();
+        var rule = GetRules(layer).FirstOrDefault(x => x.RuleId == ruleId);
+        return rule is null
+            ? []
+            :
+            [
+                new PieChartEntryViewModel { Type = "Processed", Count = rule.CountStar },
+                new PieChartEntryViewModel { Type = "Cached", Count = rule.Hits }
+            ];
     }
-    
+
+    private string GetLayerLabel(ProxySqlConfigLayer layer) => layer switch
+    {
+        ProxySqlConfigLayer.Main => L["Main (editable)"],
+        ProxySqlConfigLayer.Runtime => L["Runtime (read-only)"],
+        ProxySqlConfigLayer.Disk => L["Disk (read-only)"],
+        _ => layer.ToString()
+    };
+
+    private async Task ReloadAfterMutationAsync()
+    {
+        _loadedLayers.Remove(ProxySqlConfigLayer.Runtime);
+        _loadedLayers.Remove(ProxySqlConfigLayer.Disk);
+        await LoadLayerAsync(ProxySqlConfigLayer.Main, force: true);
+    }
+
     private async Task ShowEditModal(int ruleId)
     {
-        await DialogService.OpenAsync<EditQueryRuleDialog>(L["Edit Rule"] + " " + ruleId,
-            parameters: new Dictionary<string, object?>() { { "RuleId", ruleId } },
-            options: new DialogOptions() { CloseDialogOnEsc = true });
+        var changed = await DialogService.OpenAsync<EditQueryRuleDialog>(
+            $"{L["Edit Rule"]} {ruleId}",
+            parameters: new Dictionary<string, object?> { ["RuleId"] = ruleId },
+            options: new DialogOptions { CloseDialogOnEsc = true });
 
-        // Refresh the rules list after edit
-        MysqlQueryRulesList = (await GetMySqlRulesAsync()).ToList();
-        StateHasChanged();
+        if (changed is true)
+        {
+            await ReloadAfterMutationAsync();
+        }
     }
 
     private async Task ShowDeleteModal(int ruleId)
     {
-        await DialogService.OpenAsync<DeleteQueryRuleDialog>(L["Delete Rule"] + " " + ruleId,
-            parameters: new Dictionary<string, object?>() { { "RuleId", ruleId } },
-            options: new DialogOptions()
-                {
-                    CloseDialogOnEsc = true
-                });
-        MysqlQueryRulesList = (await GetMySqlRulesAsync()).ToList();
-        StateHasChanged();
+        await DialogService.OpenAsync<DeleteQueryRuleDialog>(
+            $"{L["Delete Rule"]} {ruleId}",
+            parameters: new Dictionary<string, object?> { ["RuleId"] = ruleId },
+            options: new DialogOptions { CloseDialogOnEsc = true });
+
+        await ReloadAfterMutationAsync();
     }
 
     private async Task CreateNewQueryRule()
     {
-        await DialogService.OpenAsync<AddQueryRuleDialog>(L["Add rule"], options: new DialogOptions()
-            {
-                CloseDialogOnEsc = true,
-            });
-        MysqlQueryRulesList = (await GetMySqlRulesAsync()).ToList();
-        StateHasChanged();
+        var changed = await DialogService.OpenAsync<AddQueryRuleDialog>(
+            L["Add rule"],
+            options: new DialogOptions { CloseDialogOnEsc = true });
+
+        if (changed is true)
+        {
+            await ReloadAfterMutationAsync();
+        }
     }
 }

@@ -8,12 +8,32 @@ namespace ProxysqlAdminUi.Web.Repositories;
 
 public class ProxySqlRepository(IDbContextFactory<ProxySqlContext> dbContextFactory)
 {
+    private static readonly IReadOnlyDictionary<(ProxySqlConfigLayer Layer, ProxySqlConfigTable Table), string>
+        ConfigTableMap = new Dictionary<(ProxySqlConfigLayer, ProxySqlConfigTable), string>
+        {
+            [(ProxySqlConfigLayer.Main, ProxySqlConfigTable.MysqlServers)] = "mysql_servers",
+            [(ProxySqlConfigLayer.Runtime, ProxySqlConfigTable.MysqlServers)] = "runtime_mysql_servers",
+            [(ProxySqlConfigLayer.Disk, ProxySqlConfigTable.MysqlServers)] = "disk.mysql_servers",
+            [(ProxySqlConfigLayer.Main, ProxySqlConfigTable.MysqlUsers)] = "mysql_users",
+            [(ProxySqlConfigLayer.Runtime, ProxySqlConfigTable.MysqlUsers)] = "runtime_mysql_users",
+            [(ProxySqlConfigLayer.Disk, ProxySqlConfigTable.MysqlUsers)] = "disk.mysql_users",
+            [(ProxySqlConfigLayer.Main, ProxySqlConfigTable.MysqlQueryRules)] = "mysql_query_rules",
+            [(ProxySqlConfigLayer.Runtime, ProxySqlConfigTable.MysqlQueryRules)] = "runtime_mysql_query_rules",
+            [(ProxySqlConfigLayer.Disk, ProxySqlConfigTable.MysqlQueryRules)] = "disk.mysql_query_rules",
+            [(ProxySqlConfigLayer.Main, ProxySqlConfigTable.GlobalVariables)] = "global_variables",
+            [(ProxySqlConfigLayer.Runtime, ProxySqlConfigTable.GlobalVariables)] = "runtime_global_variables",
+            [(ProxySqlConfigLayer.Disk, ProxySqlConfigTable.GlobalVariables)] = "disk.global_variables"
+        };
+
     // MySQL Servers
-    public async Task<IEnumerable<MysqlServerModel>> GetMySqlServers()
+    public async Task<IEnumerable<MysqlServerModel>> GetMySqlServers(
+        ProxySqlConfigLayer layer = ProxySqlConfigLayer.Main)
     {
         await using var context = await CreateContextAsync();
+        var table = GetConfigTableName(layer, ProxySqlConfigTable.MysqlServers);
+        var sql = $"SELECT * FROM {table} ORDER BY hostgroup_id, hostname, port";
         return await context.MySqlServers
-            .FromSqlRaw("SELECT * FROM mysql_servers ORDER BY hostgroup_id, hostname, port")
+            .FromSqlRaw(sql)
             .AsNoTracking()
             .ToListAsync();
     }
@@ -86,11 +106,14 @@ public class ProxySqlRepository(IDbContextFactory<ProxySqlContext> dbContextFact
     }
 
     // MySQL Users
-    public async Task<IEnumerable<MysqlUserModel>> GetMySqlUsers()
+    public async Task<IEnumerable<MysqlUserModel>> GetMySqlUsers(
+        ProxySqlConfigLayer layer = ProxySqlConfigLayer.Main)
     {
         await using var context = await CreateContextAsync();
+        var table = GetConfigTableName(layer, ProxySqlConfigTable.MysqlUsers);
+        var sql = $"SELECT * FROM {table} ORDER BY username, backend";
         return await context.MySqlUsers
-            .FromSqlRaw("SELECT * FROM mysql_users")
+            .FromSqlRaw(sql)
             .AsNoTracking()
             .ToListAsync();
     }
@@ -165,18 +188,37 @@ public class ProxySqlRepository(IDbContextFactory<ProxySqlContext> dbContextFact
     }
 
     // MySQL Query Rules
-    public async Task<IEnumerable<MysqlQueryRuleModel>> GetMySqlQueryRules()
+    public async Task<IEnumerable<MysqlQueryRuleModel>> GetMySqlQueryRules(
+        ProxySqlConfigLayer layer = ProxySqlConfigLayer.Main)
     {
         await using var context = await CreateContextAsync();
+        var table = GetConfigTableName(layer, ProxySqlConfigTable.MysqlQueryRules);
+        var sql = $"SELECT * FROM {table} ORDER BY rule_id";
         return await context.MySqlQueryRules
-            .FromSqlRaw("SELECT * FROM mysql_query_rules")
+            .FromSqlRaw(sql)
             .AsNoTracking()
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<QueryRuleViewModel>> GetQueryRulesWithStats()
+    public async Task<IEnumerable<QueryRuleViewModel>> GetQueryRulesWithStats(
+        ProxySqlConfigLayer layer = ProxySqlConfigLayer.Main)
     {
         await using var context = await CreateContextAsync();
+        if (layer != ProxySqlConfigLayer.Main)
+        {
+            var table = GetConfigTableName(layer, ProxySqlConfigTable.MysqlQueryRules);
+            var readOnlySql = $@"
+SELECT r.*,
+    0 AS Hits,
+    NULL AS DigestText,
+    0 AS CountStar
+FROM {table} r
+ORDER BY r.rule_id";
+
+            return await context.Database.SqlQueryRaw<QueryRuleViewModel>(readOnlySql)
+                .ToListAsync();
+        }
+
         const string sql = @"
 SELECT r.*,
     COALESCE(s.hits, 0) as Hits,
@@ -334,10 +376,14 @@ GROUP BY r.rule_id, r.active, r.username, r.schemaname, r.flagIN, r.client_addr,
     }
 
     // Global variables
-    public async Task<IEnumerable<GlobalVariableModel>> GetGlobalVariables()
+    public async Task<IEnumerable<GlobalVariableModel>> GetGlobalVariables(
+        ProxySqlConfigLayer layer = ProxySqlConfigLayer.Main)
     {
         await using var context = await CreateContextAsync();
+        var table = GetConfigTableName(layer, ProxySqlConfigTable.GlobalVariables);
+        var sql = $"SELECT * FROM {table} ORDER BY variable_name";
         return await context.GlobalVariables
+            .FromSqlRaw(sql)
             .AsNoTracking()
             .ToListAsync();
     }
@@ -345,11 +391,12 @@ GROUP BY r.rule_id, r.active, r.username, r.schemaname, r.flagIN, r.client_addr,
     public async Task<int> UpdateGlobalVariable(GlobalVariableModel variable)
     {
         await using var context = await CreateContextAsync();
+        var commands = GetGlobalVariableCommands(variable.VariableName);
         var result = await context.Database.ExecuteSqlRawAsync(
             "UPDATE global_variables SET variable_value = {0} WHERE variable_name = {1}",
             variable.VariableValue, variable.VariableName);
 
-        await context.Database.ExecuteSqlRawAsync("LOAD ADMIN VARIABLES TO RUNTIME");
+        await ApplyGlobalVariablesAsync(context, commands);
         return result;
     }
 
@@ -419,6 +466,35 @@ GROUP BY r.rule_id, r.active, r.username, r.schemaname, r.flagIN, r.client_addr,
     {
         await context.Database.ExecuteSqlRawAsync("LOAD MYSQL QUERY RULES TO RUNTIME;");
         await context.Database.ExecuteSqlRawAsync("SAVE MYSQL QUERY RULES TO DISK;");
+    }
+
+    private static async Task ApplyGlobalVariablesAsync(
+        ProxySqlContext context,
+        (string Load, string Save) commands)
+    {
+        await context.Database.ExecuteSqlRawAsync(commands.Load);
+        await context.Database.ExecuteSqlRawAsync(commands.Save);
+    }
+
+    private static (string Load, string Save) GetGlobalVariableCommands(string variableName)
+    {
+        if (variableName.StartsWith("admin-", StringComparison.OrdinalIgnoreCase))
+        {
+            return ("LOAD ADMIN VARIABLES TO RUNTIME;", "SAVE ADMIN VARIABLES TO DISK;");
+        }
+
+        if (variableName.StartsWith("mysql-", StringComparison.OrdinalIgnoreCase))
+        {
+            return ("LOAD MYSQL VARIABLES TO RUNTIME;", "SAVE MYSQL VARIABLES TO DISK;");
+        }
+
+        throw new NotSupportedException(
+            $"Global variable '{variableName}' does not belong to a supported ADMIN or MYSQL variable group.");
+    }
+
+    public string GetConfigTableName(ProxySqlConfigLayer layer, ProxySqlConfigTable table)
+    {
+        return ConfigTableMap[(layer, table)];
     }
 
     private static object[] ToDbValues(params object?[] values)

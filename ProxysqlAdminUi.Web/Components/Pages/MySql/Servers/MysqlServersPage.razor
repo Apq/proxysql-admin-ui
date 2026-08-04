@@ -1,4 +1,4 @@
-﻿@page "/mysql/servers"
+@page "/mysql/servers"
 
 @using ProxysqlAdminUi.Web.Models
 @using ProxysqlAdminUi.Web.Repositories
@@ -17,66 +17,144 @@
         </RadzenColumn>
         <RadzenColumn Size="6">
             <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
-                <RadzenButton Text='@L["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadServersAsync" Disabled="@_isLoading" />
-                <RadzenButton Text='@L["Add server"]' Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@ShowAddModal" Disabled="@_isLoading" />
+                <RadzenButton Text='@L["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light"
+                              Click="@RefreshCurrentLayerAsync" Disabled="@IsCurrentLayerLoading" />
+                @if (CurrentLayer == ProxySqlConfigLayer.Main)
+                {
+                    <RadzenButton Text='@L["Add server"]' Icon="add" ButtonStyle="ButtonStyle.Primary"
+                                  Click="@ShowAddModal" Disabled="@IsCurrentLayerLoading" />
+                }
             </RadzenStack>
         </RadzenColumn>
     </RadzenRow>
 
-    @if (_isLoading)
-    {
-        <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
-    }
-    else
-    {
-        <RadzenDataGrid TItem="MysqlServerModel" Data="@_servers" AllowPaging="true" AllowSorting="true"
-                        AllowFiltering="true" PageSize="20" EmptyText='@L["No MySQL servers found."]'>
-            <Columns>
-                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.HostgroupId)" Title='@L["Hostgroup"]' />
-                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Hostname)" Title='@L["Hostname"]' />
-                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Port)" Title='@L["Port"]' />
-                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Status)" Title='@L["Status"]' />
-                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Weight)" Title='@L["Weight"]' />
-                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.MaxConnections)" Title='@L["Max connections"]' />
-                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.MaxReplicationLag)" Title='@L["Max replication lag"]' />
-                <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Comment)" Title='@L["Comment"]' />
-                <RadzenDataGridColumn TItem="MysqlServerModel" Title='@L["Actions"]' Filterable="false" Sortable="false" Width="190px">
-                    <Template Context="server">
-                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                            <RadzenButton Text='@L["Edit"]' Icon="edit" Size="ButtonSize.Small"
-                                          Click="@(() => ShowEditModal(server))" />
-                            <RadzenButton Text='@L["Delete"]' Icon="delete" Size="ButtonSize.Small"
-                                          ButtonStyle="ButtonStyle.Danger"
-                                          Click="@(() => ShowDeleteModal(server))" />
-                        </RadzenStack>
-                    </Template>
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
-    }
+    <RadzenTabs @bind-SelectedIndex="_selectedLayerIndex" Change="@OnLayerChangedAsync">
+        <Tabs>
+            @foreach (var layer in ConfigLayers)
+            {
+                <RadzenTabsItem @key="layer" Text="@GetLayerLabel(layer)">
+                    <RadzenStack Gap="0.75rem" class="rz-pt-3">
+                        <RadzenRow AlignItems="AlignItems.Center">
+                            <RadzenColumn Size="8">
+                                <RadzenText TextStyle="TextStyle.Body2">
+                                    @L["Data source"]: <code>@ProxySqlRepository.GetConfigTableName(layer, ProxySqlConfigTable.MysqlServers)</code>
+                                </RadzenText>
+                            </RadzenColumn>
+                            @if (layer != ProxySqlConfigLayer.Main)
+                            {
+                                <RadzenColumn Size="4">
+                                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.25rem">
+                                        <RadzenIcon Icon="lock" />
+                                        <RadzenText TextStyle="TextStyle.Body2">@L["This layer is read-only."]</RadzenText>
+                                    </RadzenStack>
+                                </RadzenColumn>
+                            }
+                        </RadzenRow>
+
+                        @if (_loadingLayers.Contains(layer))
+                        {
+                            <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+                        }
+                        else
+                        {
+                            <RadzenDataGrid TItem="MysqlServerModel" Data="@GetServers(layer)" AllowPaging="true"
+                                            AllowSorting="true" AllowFiltering="true" PageSize="20"
+                                            EmptyText='@L["No MySQL servers found."]'>
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.HostgroupId)" Title='@L["Hostgroup"]' />
+                                    <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Hostname)" Title='@L["Hostname"]' />
+                                    <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Port)" Title='@L["Port"]' />
+                                    <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Status)" Title='@L["Status"]' />
+                                    <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Weight)" Title='@L["Weight"]' />
+                                    <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.MaxConnections)" Title='@L["Max connections"]' />
+                                    <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.MaxReplicationLag)" Title='@L["Max replication lag"]' />
+                                    <RadzenDataGridColumn TItem="MysqlServerModel" Property="@nameof(MysqlServerModel.Comment)" Title='@L["Comment"]' />
+                                    @if (layer == ProxySqlConfigLayer.Main)
+                                    {
+                                        <RadzenDataGridColumn TItem="MysqlServerModel" Title='@L["Actions"]' Filterable="false" Sortable="false" Width="190px">
+                                            <Template Context="server">
+                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                                    <RadzenButton Text='@L["Edit"]' Icon="edit" Size="ButtonSize.Small"
+                                                                  Click="@(() => ShowEditModal(server))" />
+                                                    <RadzenButton Text='@L["Delete"]' Icon="delete" Size="ButtonSize.Small"
+                                                                  ButtonStyle="ButtonStyle.Danger"
+                                                                  Click="@(() => ShowDeleteModal(server))" />
+                                                </RadzenStack>
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                    }
+                                </Columns>
+                            </RadzenDataGrid>
+                        }
+                    </RadzenStack>
+                </RadzenTabsItem>
+            }
+        </Tabs>
+    </RadzenTabs>
 </RadzenStack>
 
 @code {
-    private List<MysqlServerModel> _servers = [];
-    private bool _isLoading;
+    private static readonly ProxySqlConfigLayer[] ConfigLayers = Enum.GetValues<ProxySqlConfigLayer>();
+    private readonly Dictionary<ProxySqlConfigLayer, List<MysqlServerModel>> _serversByLayer = [];
+    private readonly HashSet<ProxySqlConfigLayer> _loadedLayers = [];
+    private readonly HashSet<ProxySqlConfigLayer> _loadingLayers = [];
+    private int _selectedLayerIndex;
 
-    protected override Task OnInitializedAsync() => LoadServersAsync();
+    private ProxySqlConfigLayer CurrentLayer => ConfigLayers[_selectedLayerIndex];
+    private bool IsCurrentLayerLoading => _loadingLayers.Contains(CurrentLayer);
 
-    private async Task LoadServersAsync()
+    protected override Task OnInitializedAsync() => LoadLayerAsync(ProxySqlConfigLayer.Main);
+
+    private async Task OnLayerChangedAsync(int index)
     {
-        _isLoading = true;
+        _selectedLayerIndex = index;
+        await LoadLayerAsync(CurrentLayer);
+    }
+
+    private Task RefreshCurrentLayerAsync() => LoadLayerAsync(CurrentLayer, force: true);
+
+    private async Task LoadLayerAsync(ProxySqlConfigLayer layer, bool force = false)
+    {
+        if (!force && _loadedLayers.Contains(layer))
+        {
+            return;
+        }
+
+        _loadingLayers.Add(layer);
         try
         {
-            _servers = (await ProxySqlRepository.GetMySqlServers()).ToList();
+            _serversByLayer[layer] = (await ProxySqlRepository.GetMySqlServers(layer)).ToList();
+            _loadedLayers.Add(layer);
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, L["Failed to load servers"], ex.Message);
+            NotificationService.Notify(
+                NotificationSeverity.Error,
+                L["Failed to load servers"],
+                $"{GetLayerLabel(layer)}: {ex.Message}");
         }
         finally
         {
-            _isLoading = false;
+            _loadingLayers.Remove(layer);
         }
+    }
+
+    private IReadOnlyList<MysqlServerModel> GetServers(ProxySqlConfigLayer layer)
+        => _serversByLayer.GetValueOrDefault(layer) ?? [];
+
+    private string GetLayerLabel(ProxySqlConfigLayer layer) => layer switch
+    {
+        ProxySqlConfigLayer.Main => L["Main (editable)"],
+        ProxySqlConfigLayer.Runtime => L["Runtime (read-only)"],
+        ProxySqlConfigLayer.Disk => L["Disk (read-only)"],
+        _ => layer.ToString()
+    };
+
+    private async Task ReloadAfterMutationAsync()
+    {
+        _loadedLayers.Remove(ProxySqlConfigLayer.Runtime);
+        _loadedLayers.Remove(ProxySqlConfigLayer.Disk);
+        await LoadLayerAsync(ProxySqlConfigLayer.Main, force: true);
     }
 
     private async Task ShowAddModal()
@@ -87,7 +165,7 @@
 
         if (changed is true)
         {
-            await LoadServersAsync();
+            await ReloadAfterMutationAsync();
         }
     }
 
@@ -105,7 +183,7 @@
 
         if (changed is true)
         {
-            await LoadServersAsync();
+            await ReloadAfterMutationAsync();
         }
     }
 
@@ -123,7 +201,7 @@
 
         if (changed is true)
         {
-            await LoadServersAsync();
+            await ReloadAfterMutationAsync();
         }
     }
 
