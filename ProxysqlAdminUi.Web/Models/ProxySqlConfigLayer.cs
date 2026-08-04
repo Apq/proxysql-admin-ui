@@ -12,5 +12,7 @@ public enum ProxySqlConfigTable
     MysqlServers,
     MysqlUsers,
     MysqlQueryRules,
-    GlobalVariables
+    GlobalVariables,
+    MysqlReplicationHostgroups,
+    MysqlGaleraHostgroups
 }

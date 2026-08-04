@@ -6,12 +6,14 @@ ProxySQL Admin UI 是一个基于 ASP.NET Core .NET 8 和 Blazor Server 的 Prox
 
 - 查看 ProxySQL 仪表盘和运行统计
 - 管理 `mysql_servers` 后端服务器
+- 在 Replication/Galera 主机组页面查看并维护对应拓扑定义所引用的成员
 - 管理 `mysql_users` 用户
 - 管理 `mysql_query_rules` 查询路由和缓存规则
 - 查看 `stats_mysql_query_digest` 查询摘要
 - 查看和编辑全局变量
 - 对服务器、用户和查询规则执行 `LOAD ... TO RUNTIME` 与 `SAVE ... TO DISK`
-- 计划增加 ProxySQL Hostgroup 主机组定义和成员关系显示（设计见 [主机组定义显示设计](docs/mysql-replication-hostgroups-design.zh-CN.md)）
+- 查看 ProxySQL Replication Hostgroup 的 Writer/Reader 定义及 Main、Runtime、Disk 成员关系
+- 查看 ProxySQL Galera Hostgroup 的 Writer、Backup Writer、Reader、Offline 定义及三层成员关系
 
 > [!CAUTION]
 > 本应用可以修改 ProxySQL 的实时路由和认证配置。生产环境请限制 Web 界面访问来源，使用专用 ProxySQL Admin 账号，在变更前核对 `main`、`runtime` 和 `disk` 的差异，并准备回滚 SQL。
@@ -98,6 +100,8 @@ Windows 就地发布和 WinSW 服务管理脚本位于 [scripts/windows](scripts
 | 首页仪表盘 | `/` |
 | MySQL 用户 | `/mysql/users` |
 | MySQL 后端服务器 | `/mysql/servers` |
+| MySQL Galera 主机组 | `/mysql/galera-hostgroups` |
+| MySQL 复制主机组 | `/mysql/replication-hostgroups`（兼容旧地址 `/mysql/hostgroups`） |
 | 查询规则 | `/mysql/rules` |
 | 查询摘要 | `/mysql/queries/digest` |
 | ProxySQL 全局变量 | `/proxysql/global-variables` |
@@ -131,6 +135,7 @@ ProxySQL 的配置修改建议遵循以下顺序：
 ## 相关设计文档
 
 - [ProxySQL 主机组定义显示设计](docs/mysql-replication-hostgroups-design.zh-CN.md)
+- [ProxySQL Galera 主机组显示设计](docs/mysql-galera-hostgroups-design.zh-CN.md)
 - [三类配置表支持方案](docs/three-table-support-plan.zh-CN.md)
 
 ## 许可证

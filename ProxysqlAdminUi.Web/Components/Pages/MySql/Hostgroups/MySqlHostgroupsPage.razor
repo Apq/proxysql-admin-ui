@@ -1,0 +1,352 @@
+@page "/mysql/hostgroups"
+@page "/mysql/replication-hostgroups"
+
+@using ProxysqlAdminUi.Web.Models
+@using ProxysqlAdminUi.Web.Repositories
+@using ProxysqlAdminUi.Web.ViewModel
+@using ProxysqlAdminUi.Web.Components.Pages.MySql.Servers
+
+@attribute [Authorize]
+
+@inject ProxySqlRepository ProxySqlRepository
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject LocalizationService L
+
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="6">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1">@L["Replication Hostgroups"]</RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="6">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+                <RadzenButton Text='@L["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light"
+                              Click="@RefreshCurrentLayerAsync" Disabled="@IsCurrentLayerLoading" />
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenTabs @bind-SelectedIndex="_selectedLayerIndex" Change="@OnLayerChangedAsync">
+        <Tabs>
+            @foreach (var layer in ConfigLayers)
+            {
+                <RadzenTabsItem @key="layer" Text="@GetLayerLabel(layer)">
+                    <RadzenStack Gap="1rem" class="rz-pt-3">
+                        <RadzenRow AlignItems="AlignItems.Center">
+                            <RadzenColumn Size="8">
+                                <RadzenText TextStyle="TextStyle.Body2">
+                                    @L["Data source"]: <code>@ProxySqlRepository.GetConfigTableName(layer, ProxySqlConfigTable.MysqlReplicationHostgroups)</code>
+                                </RadzenText>
+                            </RadzenColumn>
+                            @if (layer != ProxySqlConfigLayer.Main)
+                            {
+                                <RadzenColumn Size="4">
+                                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.25rem">
+                                        <RadzenIcon Icon="lock" />
+                                        <RadzenText TextStyle="TextStyle.Body2">@L["This layer is read-only."]</RadzenText>
+                                    </RadzenStack>
+                                </RadzenColumn>
+                            }
+                        </RadzenRow>
+
+                        @if (_loadingLayers.Contains(layer))
+                        {
+                            <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+                        }
+                        else if (_errors.TryGetValue(layer, out var error))
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" Variant="Variant.Flat">
+                                @L["Failed to load hostgroups"]: @error
+                            </RadzenAlert>
+                        }
+                        else
+                        {
+                            var overview = GetOverview(layer);
+                            <RadzenCard Variant="Variant.Text">
+                                <RadzenRow AlignItems="AlignItems.Center">
+                                    <RadzenColumn Size="8">
+                                        <RadzenText TextStyle="TextStyle.H6">@L["Monitor setting"]</RadzenText>
+                                    </RadzenColumn>
+                                    <RadzenColumn Size="4">
+                                        @if (overview.WriterIsAlsoReader is bool writerIsAlsoReader)
+                                        {
+                                            <RadzenBadge BadgeStyle="@(writerIsAlsoReader ? BadgeStyle.Success : BadgeStyle.Info)"
+                                                         Text="@(writerIsAlsoReader ? L["Writer can also be reader"] : L["Writer is not also reader"])" />
+                                        }
+                                        else
+                                        {
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text='@L["Setting unavailable"]' />
+                                        }
+                                    </RadzenColumn>
+                                </RadzenRow>
+                                <RadzenText TextStyle="TextStyle.Body2">
+                                    @L["A backend may appear in both writer and reader groups when this setting is enabled; that is not a hostgroup ID conflict."]
+                                </RadzenText>
+                            </RadzenCard>
+
+                            <RadzenStack Gap="0.5rem">
+                                <RadzenText TextStyle="TextStyle.H5">@L["Hostgroup definitions"]</RadzenText>
+                                @if (overview.Definitions.Count == 0)
+                                {
+                                    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" Variant="Variant.Flat">
+                                        @L["No replication hostgroup definitions are configured in this layer."]
+                                    </RadzenAlert>
+                                }
+                                else
+                                {
+                                    <RadzenDataGrid TItem="MysqlReplicationHostgroupModel" Data="@overview.Definitions"
+                                                    AllowPaging="true" AllowSorting="true" AllowFiltering="true" PageSize="20">
+                                        <Columns>
+                                            <RadzenDataGridColumn TItem="MysqlReplicationHostgroupModel"
+                                                                  Property="@nameof(MysqlReplicationHostgroupModel.WriterHostgroup)"
+                                                                  Title='@L["Writer hostgroup"]' />
+                                            <RadzenDataGridColumn TItem="MysqlReplicationHostgroupModel"
+                                                                  Property="@nameof(MysqlReplicationHostgroupModel.ReaderHostgroup)"
+                                                                  Title='@L["Reader hostgroup"]' />
+                                            <RadzenDataGridColumn TItem="MysqlReplicationHostgroupModel"
+                                                                  Property="@nameof(MysqlReplicationHostgroupModel.CheckType)"
+                                                                  Title='@L["Check type"]' />
+                                            <RadzenDataGridColumn TItem="MysqlReplicationHostgroupModel"
+                                                                  Property="@nameof(MysqlReplicationHostgroupModel.Comment)"
+                                                                  Title='@L["Comment"]' />
+                                        </Columns>
+                                    </RadzenDataGrid>
+                                }
+                            </RadzenStack>
+
+                            <RadzenStack Gap="0.5rem">
+                                <RadzenText TextStyle="TextStyle.H5">@L["Hostgroup members"]</RadzenText>
+                                @if (overview.Members.Count == 0)
+                                {
+                                    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" Variant="Variant.Flat">
+                                        @L["No hostgroup members are configured in this layer."]
+                                    </RadzenAlert>
+                                }
+                                else
+                                {
+                                    <RadzenDataGrid TItem="HostgroupMemberViewModel" Data="@overview.Members"
+                                                    AllowPaging="true" AllowSorting="true" AllowFiltering="true" PageSize="20">
+                                        <Columns>
+                                            <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                  Property="@nameof(HostgroupMemberViewModel.HostgroupId)"
+                                                                  Title='@L["Hostgroup"]' />
+                                            <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                  Title='@L["Role"]' Filterable="false" Sortable="false">
+                                                <Template Context="member">
+                                                    <RadzenBadge BadgeStyle="@GetRoleStyle(member.Role)"
+                                                                 Text="@GetRoleLabel(member.Role)" />
+                                                </Template>
+                                            </RadzenDataGridColumn>
+                                            <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                  Title='@L["Role source"]' Filterable="false" Sortable="false">
+                                                <Template Context="member">@GetRoleSources(member)</Template>
+                                            </RadzenDataGridColumn>
+                                            <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                  Property="@nameof(HostgroupMemberViewModel.Hostname)"
+                                                                  Title='@L["Hostname"]'>
+                                                <Template Context="member">
+                                                    @(member.HasMember ? member.Hostname : L["No configured member"])
+                                                </Template>
+                                            </RadzenDataGridColumn>
+                                            <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                  Property="@nameof(HostgroupMemberViewModel.Port)"
+                                                                  Title='@L["Port"]' />
+                                            <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                  Property="@nameof(HostgroupMemberViewModel.Status)"
+                                                                  Title='@L["Status"]' />
+                                            <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                  Property="@nameof(HostgroupMemberViewModel.Weight)"
+                                                                  Title='@L["Weight"]' />
+                                            <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                  Property="@nameof(HostgroupMemberViewModel.MaxConnections)"
+                                                                  Title='@L["Max connections"]' />
+                                            <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                  Property="@nameof(HostgroupMemberViewModel.MaxReplicationLag)"
+                                                                  Title='@L["Max replication lag"]' />
+                                            <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                  Property="@nameof(HostgroupMemberViewModel.Comment)"
+                                                                  Title='@L["Comment"]' />
+                                            @if (layer == ProxySqlConfigLayer.Main)
+                                            {
+                                                <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                      Title='@L["Actions"]' Filterable="false" Sortable="false" Width="190px">
+                                                    <Template Context="member">
+                                                        @if (member.Server is not null)
+                                                        {
+                                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                                                <RadzenButton Text='@L["Edit"]' Icon="edit" Size="ButtonSize.Small"
+                                                                              Click="@(() => ShowEditModal(member))" />
+                                                                <RadzenButton Text='@L["Delete"]' Icon="delete" Size="ButtonSize.Small"
+                                                                              ButtonStyle="ButtonStyle.Danger"
+                                                                              Click="@(() => ShowDeleteModal(member))" />
+                                                            </RadzenStack>
+                                                        }
+                                                    </Template>
+                                                </RadzenDataGridColumn>
+                                            }
+                                        </Columns>
+                                    </RadzenDataGrid>
+                                }
+                            </RadzenStack>
+                        }
+                    </RadzenStack>
+                </RadzenTabsItem>
+            }
+        </Tabs>
+    </RadzenTabs>
+</RadzenStack>
+
+@code {
+    private static readonly ProxySqlConfigLayer[] ConfigLayers = Enum.GetValues<ProxySqlConfigLayer>();
+    private readonly Dictionary<ProxySqlConfigLayer, HostgroupOverviewViewModel> _overviews = [];
+    private readonly Dictionary<ProxySqlConfigLayer, string> _errors = [];
+    private readonly HashSet<ProxySqlConfigLayer> _loadedLayers = [];
+    private readonly HashSet<ProxySqlConfigLayer> _loadingLayers = [];
+    private int _selectedLayerIndex;
+
+    private ProxySqlConfigLayer CurrentLayer => ConfigLayers[_selectedLayerIndex];
+    private bool IsCurrentLayerLoading => _loadingLayers.Contains(CurrentLayer);
+
+    protected override Task OnInitializedAsync() => LoadLayerAsync(ProxySqlConfigLayer.Main);
+
+    private async Task OnLayerChangedAsync(int index)
+    {
+        _selectedLayerIndex = index;
+        await LoadLayerAsync(CurrentLayer);
+    }
+
+    private Task RefreshCurrentLayerAsync() => LoadLayerAsync(CurrentLayer, force: true);
+
+    private async Task ReloadAfterMutationAsync()
+    {
+        _loadedLayers.Remove(ProxySqlConfigLayer.Runtime);
+        _loadedLayers.Remove(ProxySqlConfigLayer.Disk);
+        _overviews.Remove(ProxySqlConfigLayer.Runtime);
+        _overviews.Remove(ProxySqlConfigLayer.Disk);
+        await LoadLayerAsync(ProxySqlConfigLayer.Main, force: true);
+    }
+
+    private async Task ShowEditModal(HostgroupMemberViewModel member)
+    {
+        var server = member.Server;
+        if (server is null)
+        {
+            return;
+        }
+
+        var changed = await DialogService.OpenAsync<EditMysqlServerDialog>(
+            $"{L["Edit"]} {server.Hostname}:{server.Port} in HG {server.HostgroupId}",
+            new Dictionary<string, object?>
+            {
+                [nameof(EditMysqlServerDialog.HostgroupId)] = server.HostgroupId,
+                [nameof(EditMysqlServerDialog.Hostname)] = server.Hostname,
+                [nameof(EditMysqlServerDialog.Port)] = server.Port
+            },
+            GetDialogOptions());
+
+        if (changed is true)
+        {
+            await ReloadAfterMutationAsync();
+        }
+    }
+
+    private async Task ShowDeleteModal(HostgroupMemberViewModel member)
+    {
+        var server = member.Server;
+        if (server is null)
+        {
+            return;
+        }
+
+        var changed = await DialogService.OpenAsync<DeleteMysqlServerDialog>(
+            $"{L["Delete"]} {server.Hostname}:{server.Port} from HG {server.HostgroupId}",
+            new Dictionary<string, object?>
+            {
+                [nameof(DeleteMysqlServerDialog.HostgroupId)] = server.HostgroupId,
+                [nameof(DeleteMysqlServerDialog.Hostname)] = server.Hostname,
+                [nameof(DeleteMysqlServerDialog.Port)] = server.Port
+            },
+            new DialogOptions { CloseDialogOnEsc = true, Width = "560px" });
+
+        if (changed is true)
+        {
+            await ReloadAfterMutationAsync();
+        }
+    }
+
+    private static DialogOptions GetDialogOptions() => new()
+    {
+        CloseDialogOnEsc = true,
+        Width = "900px"
+    };
+
+    private async Task LoadLayerAsync(ProxySqlConfigLayer layer, bool force = false)
+    {
+        if (!force && _loadedLayers.Contains(layer))
+        {
+            return;
+        }
+
+        _loadingLayers.Add(layer);
+        _errors.Remove(layer);
+        try
+        {
+            _overviews[layer] = await ProxySqlRepository.GetHostgroupOverview(layer);
+            _loadedLayers.Add(layer);
+        }
+        catch (Exception ex)
+        {
+            _errors[layer] = ex.Message;
+            NotificationService.Notify(
+                NotificationSeverity.Error,
+                L["Failed to load hostgroups"],
+                $"{GetLayerLabel(layer)}: {ex.Message}");
+        }
+        finally
+        {
+            _loadingLayers.Remove(layer);
+        }
+    }
+
+    private HostgroupOverviewViewModel GetOverview(ProxySqlConfigLayer layer)
+        => _overviews.GetValueOrDefault(layer) ?? new HostgroupOverviewViewModel();
+
+    private string GetLayerLabel(ProxySqlConfigLayer layer) => layer switch
+    {
+        ProxySqlConfigLayer.Main => L["Main (editable)"],
+        ProxySqlConfigLayer.Runtime => L["Runtime (read-only)"],
+        ProxySqlConfigLayer.Disk => L["Disk (read-only)"],
+        _ => layer.ToString()
+    };
+
+    private string GetRoleLabel(HostgroupRole role) => role switch
+    {
+        HostgroupRole.Writer => L["Writer"],
+        HostgroupRole.Reader => L["Reader"],
+        HostgroupRole.Conflict => L["Role conflict"],
+        _ => L["Undefined hostgroup"]
+    };
+
+    private BadgeStyle GetRoleStyle(HostgroupRole role) => role switch
+    {
+        HostgroupRole.Writer => BadgeStyle.Success,
+        HostgroupRole.Reader => BadgeStyle.Info,
+        HostgroupRole.Conflict => BadgeStyle.Danger,
+        _ => BadgeStyle.Warning
+    };
+
+    private string GetRoleSources(HostgroupMemberViewModel member)
+    {
+        if (member.AssignedRoles.Count == 0)
+        {
+            return L["No role definition"];
+        }
+
+        return string.Join(", ", member.AssignedRoles.Select(role => role switch
+        {
+            HostgroupRole.Writer => "writer_hostgroup",
+            HostgroupRole.Reader => "reader_hostgroup",
+            _ => role.ToString()
+        }));
+    }
+}

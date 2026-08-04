@@ -22,7 +22,13 @@ public class ProxySqlRepository(IDbContextFactory<ProxySqlContext> dbContextFact
             [(ProxySqlConfigLayer.Disk, ProxySqlConfigTable.MysqlQueryRules)] = "disk.mysql_query_rules",
             [(ProxySqlConfigLayer.Main, ProxySqlConfigTable.GlobalVariables)] = "global_variables",
             [(ProxySqlConfigLayer.Runtime, ProxySqlConfigTable.GlobalVariables)] = "runtime_global_variables",
-            [(ProxySqlConfigLayer.Disk, ProxySqlConfigTable.GlobalVariables)] = "disk.global_variables"
+            [(ProxySqlConfigLayer.Disk, ProxySqlConfigTable.GlobalVariables)] = "disk.global_variables",
+            [(ProxySqlConfigLayer.Main, ProxySqlConfigTable.MysqlReplicationHostgroups)] = "mysql_replication_hostgroups",
+            [(ProxySqlConfigLayer.Runtime, ProxySqlConfigTable.MysqlReplicationHostgroups)] = "runtime_mysql_replication_hostgroups",
+            [(ProxySqlConfigLayer.Disk, ProxySqlConfigTable.MysqlReplicationHostgroups)] = "disk.mysql_replication_hostgroups",
+            [(ProxySqlConfigLayer.Main, ProxySqlConfigTable.MysqlGaleraHostgroups)] = "mysql_galera_hostgroups",
+            [(ProxySqlConfigLayer.Runtime, ProxySqlConfigTable.MysqlGaleraHostgroups)] = "runtime_mysql_galera_hostgroups",
+            [(ProxySqlConfigLayer.Disk, ProxySqlConfigTable.MysqlGaleraHostgroups)] = "disk.mysql_galera_hostgroups"
         };
 
     // MySQL Servers
@@ -103,6 +109,62 @@ public class ProxySqlRepository(IDbContextFactory<ProxySqlContext> dbContextFact
         EnsureRowChanged(result, "The MySQL server no longer exists or was changed by another user.");
         await ApplyMySqlServersAsync(context);
         return result;
+    }
+
+    // MySQL Replication Hostgroups
+    public async Task<IReadOnlyList<MysqlReplicationHostgroupModel>> GetMySqlReplicationHostgroups(
+        ProxySqlConfigLayer layer = ProxySqlConfigLayer.Main)
+    {
+        await using var context = await CreateContextAsync();
+        var table = GetConfigTableName(layer, ProxySqlConfigTable.MysqlReplicationHostgroups);
+        var sql = $"SELECT writer_hostgroup, reader_hostgroup, check_type, comment FROM {table} ORDER BY writer_hostgroup, reader_hostgroup";
+        return await context.Database.SqlQueryRaw<MysqlReplicationHostgroupModel>(sql).ToListAsync();
+    }
+
+    public async Task<HostgroupOverviewViewModel> GetHostgroupOverview(
+        ProxySqlConfigLayer layer = ProxySqlConfigLayer.Main)
+    {
+        var definitions = await GetMySqlReplicationHostgroups(layer);
+        var servers = await GetMySqlServers(layer);
+        bool? writerIsAlsoReader = null;
+        try
+        {
+            var variables = await GetGlobalVariables(layer);
+            var writerIsAlsoReaderValue = variables
+                .FirstOrDefault(variable => string.Equals(
+                    variable.VariableName,
+                    "mysql-monitor_writer_is_also_reader",
+                    StringComparison.OrdinalIgnoreCase))?.VariableValue;
+            writerIsAlsoReader = ParseProxySqlBoolean(writerIsAlsoReaderValue);
+        }
+        catch
+        {
+            // Hostgroup definitions and members remain useful when global variables are unavailable.
+        }
+
+        return HostgroupOverviewViewModel.Create(definitions, servers, writerIsAlsoReader);
+    }
+
+    // MySQL Galera Hostgroups
+    public async Task<IReadOnlyList<MysqlGaleraHostgroupModel>> GetMySqlGaleraHostgroups(
+        ProxySqlConfigLayer layer = ProxySqlConfigLayer.Main)
+    {
+        await using var context = await CreateContextAsync();
+        var table = GetConfigTableName(layer, ProxySqlConfigTable.MysqlGaleraHostgroups);
+        var sql = $@"SELECT writer_hostgroup, backup_writer_hostgroup, reader_hostgroup,
+                           offline_hostgroup, active, max_writers, writer_is_also_reader,
+                           max_transactions_behind, comment
+                    FROM {table}
+                    ORDER BY writer_hostgroup, backup_writer_hostgroup, reader_hostgroup, offline_hostgroup";
+        return await context.Database.SqlQueryRaw<MysqlGaleraHostgroupModel>(sql).ToListAsync();
+    }
+
+    public async Task<GaleraHostgroupOverviewViewModel> GetGaleraHostgroupOverview(
+        ProxySqlConfigLayer layer = ProxySqlConfigLayer.Main)
+    {
+        var definitions = await GetMySqlGaleraHostgroups(layer);
+        var servers = await GetMySqlServers(layer);
+        return GaleraHostgroupOverviewViewModel.Create(definitions, servers);
     }
 
     // MySQL Users
@@ -495,6 +557,21 @@ GROUP BY r.rule_id, r.active, r.username, r.schemaname, r.flagIN, r.client_addr,
     public string GetConfigTableName(ProxySqlConfigLayer layer, ProxySqlConfigTable table)
     {
         return ConfigTableMap[(layer, table)];
+    }
+
+    private static bool? ParseProxySqlBoolean(string? value)
+    {
+        if (bool.TryParse(value, out var booleanValue))
+        {
+            return booleanValue;
+        }
+
+        if (int.TryParse(value, out var integerValue) && integerValue is 0 or 1)
+        {
+            return integerValue == 1;
+        }
+
+        return null;
     }
 
     private static object[] ToDbValues(params object?[] values)

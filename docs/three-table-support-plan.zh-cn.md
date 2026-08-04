@@ -46,7 +46,7 @@
 
 #### 后端服务器
 
-现有 `MysqlServersPage.razor` 的列表作为 Main 页签内容，Runtime 和 Disk 使用相同列，但隐藏操作列。
+`MysqlServersPage.razor` 显示全部 `mysql_servers`，作为新增服务器和管理未归属拓扑服务器的统一入口。Replication/Galera 主机组页面只显示各自定义所引用的 Hostgroup 成员，不能用它们替代完整服务器列表。
 
 #### 用户
 

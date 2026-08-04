@@ -1,228 +1,168 @@
-# ProxySQL 主机组定义显示设计
+# ProxySQL Replication 主机组定义显示设计
 
-## 1. 需求说明
+本文只描述传统 `mysql_replication_hostgroups`。Galera 使用独立的
+`mysql_galera_hostgroups` 页面和模型，详见
+[Galera 主机组显示设计](mysql-galera-hostgroups-design.zh-CN.md)。两种拓扑不能混用。
 
-当前项目的 MySQL Servers 页面只显示 `mysql_servers` 中的后端节点。页面可以看到 `hostgroup_id`，但看不出这个数字代表什么业务角色，例如：
+## 1. 当前背景
 
-- 为什么 `10` 是主写组？
-- 为什么 `20` 是备写组？
-- 哪个分组是读组？
-- 哪些后端属于同一个分组？
-- 这个分组的读写切换、复制延迟和最大写节点数限制是什么？
+`mysql_servers.hostgroup_id` 只是后端所属的主机组编号。编号本身没有“主写”“备写”或“读”的固定含义，角色来自 ProxySQL 的拓扑定义表。
 
-需要在本项目中增加一个“主机组定义”页面，读取 ProxySQL 中主机组角色定义表，并把主机组定义与 `mysql_servers` 中的实际后端成员关联显示。
+独立 MySQL Servers 页面负责显示和管理全部 `mysql_servers`；Replication 页面只显示定义引用的
+Writer/Reader Hostgroup 成员，并支持 Main、Runtime、Disk 三个页签：
 
-这里的“分组”指 ProxySQL 的 **Hostgroup（主机组）**，不是 `main`、`runtime`、`disk` 配置层级。
+| 层级 | 成员表 | 含义 |
+| --- | --- | --- |
+| Main | `mysql_servers` | 配置编辑区 |
+| Runtime | `runtime_mysql_servers` | 当前已加载并正在使用的成员 |
+| Disk | `disk.mysql_servers` | 持久化配置 |
 
-## 2. 核心概念
+因此，主机组页面不再设计成独立的“配置视图 / 生效视图”切换，而是复用相同的三层页签，在同一层级同时读取角色定义和成员。
 
-### 2.1 `hostgroup_id` 没有固定业务含义
+页面路由为 `/mysql/replication-hostgroups`（兼容 `/mysql/hostgroups`），用于回答：
 
-`mysql_servers.hostgroup_id` 只是后端服务器所属的主机组编号。`10`、`20`、`30` 等数字是部署者自定义的 ID，ProxySQL 不会因为数字大小自动判断“主写”“备写”或“读”。
+- 某个 hostgroup ID 被定义成 Writer 还是 Reader？
+- 这个定义来自哪一行配置？
+- 当前层级有哪些成员属于该组？
+- Writer/Reader 定义引用的 Hostgroup 是否有成员？
+- Main、Runtime、Disk 中的定义和成员是否分别存在？
 
-例如，下面这条定义才真正赋予了角色含义：
+## 2. ProxySQL 角色定义
+
+### 2.1 `mysql_replication_hostgroups` 的真实 schema
+
+在当前支持的 ProxySQL 版本中，`mysql_replication_hostgroups` 及其 Runtime、Disk 表包含以下字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `writer_hostgroup` | Writer 主机组 ID |
+| `reader_hostgroup` | Reader 主机组 ID |
+| `check_type` | Monitor 检查类型 |
+| `comment` | 管理员备注 |
+
+当前版本不应从这张表读取以下字段：
+
+- `backup_writer_hostgroup`
+- `offline_hostgroup`
+- `max_writers`
+- `max_transactions_behind`
+
+这些字段不能假设存在。不同拓扑表（例如 Group Replication 或 Galera）可能有不同的列结构，后续支持时应使用独立模型和独立查询。
+
+角色定义示例：
 
 ```sql
 INSERT INTO mysql_replication_hostgroups
-    (writer_hostgroup, reader_hostgroup, backup_writer_hostgroup,
-     offline_hostgroup, max_writers, max_transactions_behind, comment)
+    (writer_hostgroup, reader_hostgroup, check_type, comment)
 VALUES
-    (10, 30, 20, 40, 1, 100, '业务 MySQL 主从集群');
+    (10, 30, 'read_only', '业务 MySQL 复制集群');
 ```
 
-这表示：
+这表示 `10` 是 Writer 主机组，`30` 是 Reader 主机组。不是因为数字 `10` 或 `30` 有特殊语义。
 
-| 字段 | 值 | 含义 |
-| --- | ---: | --- |
-| `writer_hostgroup` | `10` | 写节点主机组，通常是当前主写组 |
-| `reader_hostgroup` | `30` | 读节点主机组 |
-| `backup_writer_hostgroup` | `20` | 备用写节点主机组，没有被选为当前写节点的候选节点 |
-| `offline_hostgroup` | `40` | 不满足拓扑或健康条件时使用的离线主机组 |
-| `max_writers` | `1` | 写主机组最多允许的 writer 数量 |
-| `max_transactions_behind` | `100` | 复制延迟超过该值时的处理阈值 |
+### 2.2 Monitor 与 Writer/Reader 重叠
 
-因此，“为什么 10 是主写、20 是备写”的答案不是因为 `10` 或 `20` 有特殊规则，而是因为 `mysql_replication_hostgroups` 的这一行配置了：
+Monitor 会根据角色定义和后端状态调整 Runtime 中的成员归属。`mysql-monitor_writer_is_also_reader` 为真时，同一个物理后端可能同时出现在 Writer 和 Reader 组中，这是合法的成员关系，不应直接标记为角色冲突。
 
-```text
-writer_hostgroup = 10
-backup_writer_hostgroup = 20
-```
+需要区分两个概念：
 
-### 2.2 `mysql_servers` 负责成员，角色定义表负责语义
+- 同一物理后端出现在两个不同主机组：可以是合法的 Writer/Reader 重叠。
+- 同一个 hostgroup ID 同时出现在 `writer_hostgroup` 和 `reader_hostgroup`：该 ID 的角色无法唯一解释，显示为角色冲突。
 
-两张表的职责不同：
-
-```text
-mysql_replication_hostgroups
-    -> 定义 10、20、30、40 分别是什么角色
-
-mysql_servers
-    -> 定义 hostname:port 当前属于哪个 hostgroup_id
-```
-
-例如：
-
-```sql
-SELECT * FROM mysql_replication_hostgroups;
-
-SELECT hostgroup_id, hostname, port, status, weight, comment
-FROM mysql_servers
-ORDER BY hostgroup_id, hostname, port;
-```
-
-如果 `mysql_servers` 中某台服务器的 `hostgroup_id = 10`，并且角色定义表的 `writer_hostgroup = 10`，那么这台服务器属于写主机组。仅凭 `hostgroup_id = 10` 本身，不能得出它是主写节点。
-
-### 2.3 Monitor 负责根据后端状态调整成员
-
-对于复制集群，ProxySQL Monitor 会检查后端的 `read_only`、复制延迟、连接和 Ping 状态，并由 Hostgroups Manager 根据 `mysql_replication_hostgroups` 的定义调整后端所在的运行时主机组。
-
-典型流程为：
-
-```text
-读取 mysql_replication_hostgroups
-    -> Monitor 检查后端 read_only 和复制状态
-    -> 根据规则调整 runtime_mysql_servers 的 hostgroup_id
-    -> 查询路由根据 runtime 主机组转发读写请求
-```
-
-所以页面需要同时展示：
-
-- 配置中定义的角色映射。
-- 当前 `mysql_servers` 中的成员归属。
-- 当前 `runtime_mysql_servers` 中实际生效的成员归属。
-- Monitor 相关的健康状态和最近检查结果（如可用）。
+页面展示的“角色冲突”只针对第二种情况。
 
 ## 3. 页面设计
 
-### 3.1 页面入口
+### 3.1 三个页签
 
-在 MySQL 菜单下增加：
-
-```text
-MySQL Hostgroups
-```
-
-建议路由：
+Hostgroups 页面使用与现有配置页面一致的页签：
 
 ```text
-/mysql/hostgroups
+[ Main（只读） ] [ Runtime（只读） ] [ Disk（只读） ]
 ```
 
-页面只读展示为第一期目标。角色定义会影响读写路由，暂不在页面上直接编辑，避免误改导致流量切换。
+页面不允许直接编辑 Hostgroup 定义，避免误触发读写拓扑切换；Main 层允许编辑和删除已关联的
+`mysql_servers` 成员，新增服务器统一从 MySQL Servers 页面完成。保存后加载到 Runtime 并持久化
+到 Disk。每个页签同时展示：
 
-### 3.2 页面上半部分：主机组角色定义
+1. 当前层级的 `mysql_replication_hostgroups` 定义。
+2. 同一层级的 `mysql_servers` 成员。
+3. 当前层级的 `mysql-monitor_writer_is_also_reader` 值（如可读取）。
 
-主表显示 `mysql_replication_hostgroups` 的每一行：
+页签行为：
 
-| 页面字段 | 数据字段 | 说明 |
-| --- | --- | --- |
-| 写主机组 | `writer_hostgroup` | 当前写节点所在主机组 ID |
-| 读主机组 | `reader_hostgroup` | 读节点所在主机组 ID |
-| 备用写主机组 | `backup_writer_hostgroup` | 备用写节点所在主机组 ID |
-| 离线主机组 | `offline_hostgroup` | 不可用或不符合拓扑的节点所在主机组 ID |
-| 最大写节点数 | `max_writers` | 写节点数量限制 |
-| 最大事务延迟 | `max_transactions_behind` | 复制延迟阈值 |
-| 是否允许 writer 兼 reader | 全局变量 | `mysql-monitor_writer_is_also_reader` 的当前值 |
-| 说明 | `comment` | 管理员对该集群的描述 |
+- 默认打开 Main。
+- 页签首次打开时按需读取，之后复用已加载结果。
+- 刷新只刷新当前页签。
+- 表不存在、权限不足、查询失败和空数据分别展示。
+- 页面显示固定的数据源表名，避免把 Main、Runtime、Disk 混淆。
 
-每个 ID 同时显示语义标签，例如：
+### 3.2 角色定义区域
 
-```text
-10  写主机组（Writer）
-20  备用写主机组（Backup Writer）
-30  读主机组（Reader）
-40  离线主机组（Offline）
-```
+显示 `mysql_replication_hostgroups` 的所有行：
 
-ID 不存在时显示“未配置成员”，而不是把它当作错误。多个复制集群配置行可能使用不同的主机组 ID，页面不能假设全局只有一组 `10/20/30/40`。
+| 页面字段 | 数据字段 |
+| --- | --- |
+| Writer 主机组 | `writer_hostgroup` |
+| Reader 主机组 | `reader_hostgroup` |
+| 检查类型 | `check_type` |
+| 备注 | `comment` |
 
-### 3.3 页面下半部分：主机组成员
+没有定义行时显示“当前层级未配置复制主机组定义”，不能把空数据解释成默认的 10/20/30/40 角色。
 
-按主机组聚合 `mysql_servers`：
+### 3.3 成员区域
 
-| 主机组 ID | 角色 | 主机名 | 端口 | 状态 | 权重 | 最大连接数 | 复制延迟 | 来源 |
-| ---: | --- | --- | ---: | --- | ---: | ---: | ---: | --- |
-| 10 | 写主机组 | `db-primary` | 3306 | ONLINE | 100 | 500 | 0 | main/runtime |
-| 20 | 备用写主机组 | `db-replica-1` | 3306 | ONLINE | 100 | 500 | 3 | main/runtime |
-| 30 | 读主机组 | `db-replica-2` | 3306 | ONLINE | 100 | 500 | 2 | main/runtime |
+按 `hostgroup_id` 展示同层级的 `mysql_servers`：
 
-每一行都应显示“角色来源”：
+| 页面字段 | 来源 |
+| --- | --- |
+| 主机组 ID | `hostgroup_id` |
+| 角色 | 由定义表推断 |
+| 角色来源 | `writer_hostgroup` / `reader_hostgroup` |
+| 主机名 | `hostname` |
+| 端口 | `port` |
+| 状态 | `status` |
+| 权重 | `weight` |
+| 最大连接数 | `max_connections` |
+| 最大复制延迟 | `max_replication_lag` |
 
-- `mysql_replication_hostgroups` 映射得到的角色。
-- 未被任何角色定义引用时显示“未定义主机组”。
-- 同一个 ID 被多个角色字段引用时显示“角色冲突”，并在详情中列出所有引用位置。
+角色状态：
 
-### 3.4 运行时与配置的区别
+- Writer：只命中 `writer_hostgroup`。
+- Reader：只命中 `reader_hostgroup`。
+- 角色冲突：同一 ID 同时命中 Writer 和 Reader。
+- 未被当前定义引用的 Hostgroup 不在本页面显示，应在 MySQL Servers 页面管理。
 
-页面提供两个视图：
+定义中有 ID 但成员为空时，仍显示一行“未配置成员”，帮助用户发现配置和成员之间的缺口。
 
-- 配置视图：读取 `main.mysql_replication_hostgroups` 和 `main.mysql_servers`，表示配置编辑区。
-- 生效视图：读取对应的 runtime 表，表示 ProxySQL 当前实际使用的主机组和成员。
+## 4. 数据查询
 
-页面顶部显示当前视图：
+### 4.1 定义表
 
-```text
-配置视图：main
-当前生效视图：runtime
-```
+层级到表名必须来自代码白名单：
 
-如果同一服务器在 `main` 和 `runtime` 中的 `hostgroup_id` 不同，显示警告：
+| 层级 | 定义表 |
+| --- | --- |
+| Main | `mysql_replication_hostgroups` |
+| Runtime | `runtime_mysql_replication_hostgroups` |
+| Disk | `disk.mysql_replication_hostgroups` |
 
-```text
-该后端的配置分组与当前生效分组不一致。
-```
-
-## 4. 数据查询设计
-
-### 4.1 角色定义查询
-
-主查询：
+查询使用固定列，不使用 `SELECT *`，避免版本增加或减少列时破坏模型映射：
 
 ```sql
 SELECT writer_hostgroup,
        reader_hostgroup,
-       backup_writer_hostgroup,
-       offline_hostgroup,
-       max_writers,
-       max_transactions_behind,
+       check_type,
        comment
 FROM mysql_replication_hostgroups
 ORDER BY writer_hostgroup, reader_hostgroup;
 ```
 
-运行时查看时查询：
+Runtime 和 Disk 只替换为白名单中的对应表引用。
 
-```sql
-SELECT writer_hostgroup,
-       reader_hostgroup,
-       backup_writer_hostgroup,
-       offline_hostgroup,
-       max_writers,
-       max_transactions_behind,
-       comment
-FROM runtime_mysql_replication_hostgroups
-ORDER BY writer_hostgroup, reader_hostgroup;
-```
+### 4.2 成员表
 
-持久化配置查看时查询：
-
-```sql
-SELECT writer_hostgroup,
-       reader_hostgroup,
-       backup_writer_hostgroup,
-       offline_hostgroup,
-       max_writers,
-       max_transactions_behind,
-       comment
-FROM disk.mysql_replication_hostgroups
-ORDER BY writer_hostgroup, reader_hostgroup;
-```
-
-实际支持的 runtime/disk 表名和列结构必须在项目支持的 ProxySQL 版本上验证。文档中的 SQL 是设计目标，不能替代目标实例上的表结构探测。
-
-### 4.2 成员查询
-
-主配置和运行时成员分别读取：
+成员读取复用现有三层映射：
 
 ```sql
 SELECT hostgroup_id,
@@ -237,32 +177,21 @@ FROM mysql_servers
 ORDER BY hostgroup_id, hostname, port;
 ```
 
-```sql
-SELECT hostgroup_id,
-       hostname,
-       port,
-       status,
-       weight,
-       max_connections,
-       max_replication_lag,
-       comment
-FROM runtime_mysql_servers
-ORDER BY hostgroup_id, hostname, port;
-```
+成员和定义必须使用相同层级，不能用 Main 定义关联 Runtime 成员后再把结果称为单层配置。
 
-### 4.3 与查询规则关联
+### 4.3 Monitor 变量
 
-查询规则页面已经显示 `destination_hostgroup`。增加主机组定义页面后，建议把数字 ID 渲染为：
+在同一层级读取 `mysql-monitor_writer_is_also_reader`：
 
-```text
-目标主机组：10（写主机组）
-```
+- Main：`global_variables`
+- Runtime：`runtime_global_variables`
+- Disk：`disk.global_variables`
 
-如果 ID 未在角色定义中出现，仍显示数字并附带“未定义主机组”。这样可以帮助用户理解查询规则为什么会被路由到某个组。
+变量不存在或没有权限时显示“设置不可用”。不把变量读取失败当作 `false`。
 
-## 5. 数据模型设计
+## 5. 数据模型与角色推断
 
-新增模型：
+### 5.1 定义模型
 
 ```csharp
 [Table("mysql_replication_hostgroups")]
@@ -274,160 +203,127 @@ public class MysqlReplicationHostgroupModel
     [Column("reader_hostgroup")]
     public int ReaderHostgroup { get; set; }
 
-    [Column("backup_writer_hostgroup")]
-    public int? BackupWriterHostgroup { get; set; }
-
-    [Column("offline_hostgroup")]
-    public int? OfflineHostgroup { get; set; }
-
-    [Column("max_writers")]
-    public int? MaxWriters { get; set; }
-
-    [Column("max_transactions_behind")]
-    public int? MaxTransactionsBehind { get; set; }
+    [Column("check_type")]
+    public string? CheckType { get; set; }
 
     [Column("comment")]
     public string? Comment { get; set; }
 }
 ```
 
-建议增加展示模型，不把角色推断逻辑放入 `MysqlServerModel`：
+### 5.2 角色推断规则
 
-```csharp
-public enum HostgroupRole
-{
-    Undefined,
-    Writer,
-    Reader,
-    BackupWriter,
-    Offline,
-    Conflict
-}
+对每个 hostgroup ID 收集所有定义行的引用：
 
-public sealed class HostgroupMemberViewModel
-{
-    public int HostgroupId { get; set; }
-    public string RoleName { get; set; } = string.Empty;
-    public HostgroupRole Role { get; set; }
-    public List<MysqlServerModel> Servers { get; set; } = [];
-}
-```
+1. 命中 `writer_hostgroup`，加入 Writer 角色。
+2. 命中 `reader_hostgroup`，加入 Reader 角色。
+3. 只命中 Writer，显示 Writer。
+4. 只命中 Reader，显示 Reader。
+5. 同时命中 Writer 和 Reader，显示角色冲突。
+6. 没有任何引用的服务器不属于该 Replication 定义，不加入成员结果。
 
-角色推断规则：
+角色推断只针对主机组 ID。物理后端同时出现在 Writer 和 Reader 两个不同 ID 中不属于该规则的冲突。
 
-1. `hostgroup_id == writer_hostgroup`，角色为 Writer。
-2. `hostgroup_id == reader_hostgroup`，角色为 Reader。
-3. `hostgroup_id == backup_writer_hostgroup`，角色为 BackupWriter。
-4. `hostgroup_id == offline_hostgroup`，角色为 Offline。
-5. 同一 ID 命中多个不同角色时，角色为 Conflict。
-6. 没有命中任何定义时，角色为 Undefined。
+## 6. Repository 与页面实现
 
-## 6. Repository 和页面改造
+### 6.1 固定映射
 
-### 6.1 `ProxySqlContext`
+在现有 `ProxySqlConfigTable` 中加入 `MysqlReplicationHostgroups`，并加入 Main、Runtime、Disk 三个固定表引用。页面只能通过 Repository 取得数据源表名，不能拼接用户输入。
+
+### 6.2 Repository 方法
 
 增加：
 
 ```csharp
-public DbSet<MysqlReplicationHostgroupModel> MySqlReplicationHostgroups { get; set; }
-```
-
-如果 runtime 和 disk 表通过同一个模型读取，建议使用 `Database.SqlQueryRaw<T>`，不要让 EF 模型只绑定到 `main` 表后再隐式切换。
-
-### 6.2 `ProxySqlRepository`
-
-增加以下读取方法：
-
-```csharp
-Task<IEnumerable<MysqlReplicationHostgroupModel>> GetMySqlReplicationHostgroups(
+Task<IReadOnlyList<MysqlReplicationHostgroupModel>> GetMySqlReplicationHostgroups(
     ProxySqlConfigLayer layer = ProxySqlConfigLayer.Main);
 
-Task<IEnumerable<HostgroupMemberViewModel>> GetHostgroupMembers(
+Task<HostgroupOverviewViewModel> GetHostgroupOverview(
     ProxySqlConfigLayer layer = ProxySqlConfigLayer.Main);
 ```
 
-`GetHostgroupMembers` 的实现步骤：
+`GetHostgroupOverview` 的流程：
 
-1. 读取指定层级的 `mysql_replication_hostgroups`。
-2. 读取同一层级的 `mysql_servers`。
-3. 建立角色 ID 到角色类型的映射。
-4. 按 `hostgroup_id` 聚合成员。
-5. 生成未定义和角色冲突状态。
+1. 读取同层级的角色定义。
+2. 读取同层级的 `mysql_servers`。
+3. 读取同层级的 Monitor 变量。
+4. 建立 ID 到角色集合的映射。
+5. 仅合并定义引用的 Hostgroup；定义中的空组仍生成占位行。
+6. 生成成员展示行。
 
 ### 6.3 页面入口
 
-在 [MainLayout.razor](../ProxysqlAdminUi.Web/Components/Layout/MainLayout.razor) 的 MySQL 菜单下增加：
+在 MySQL 菜单增加：
 
-```razor
-<RadzenMenuItem Text="@HostgroupsText" Icon="account_tree" Path="/mysql/hostgroups" />
+```text
+MySQL Hostgroups
+路由：/mysql/hostgroups
 ```
 
-页面组件建议为：
+页面组件：
 
 ```text
 ProxysqlAdminUi.Web/Components/Pages/MySql/Hostgroups/MySqlHostgroupsPage.razor
 ```
 
-### 6.4 现有页面增强
+## 7. 后续阶段
 
-- Servers 页面：`Hostgroup` 列增加角色名称和定义来源。
-- Users 页面：`Default HG` 列增加主机组角色名称。
-- Query Rules 页面：`Destination host group`、`Mirror hostgroup` 和 `GTID From Hostgroup` 增加角色名称。
-- Query Digest 页面：`Hostgroup` 列增加角色名称。
-- 主机组页面：提供从主机组跳转到对应服务器筛选结果的入口。
+以下内容不作为本次第一期的前置条件：
 
-## 7. 版本和表结构兼容
+### 阶段二：现有页面显示角色名称
 
-ProxySQL 不同版本可能支持不同的拓扑表：
+- Servers 的 Hostgroup 列增加 Writer/Reader 标签。
+- Users 的 Default HG 增加角色名称。
+- Query Rules 的 Destination、Mirror、GTID Hostgroup 增加角色名称。
+- Query Digest 的 Hostgroup 增加角色名称。
 
-- `mysql_replication_hostgroups`：传统 MySQL 复制主从拓扑。
-- `mysql_group_replication_hostgroups`：MySQL Group Replication 拓扑。
-- `mysql_galera_hostgroups`：Galera 集群拓扑。
+这些页面需要决定使用当前页签的定义层级，不能把 Main 角色名称套到 Runtime 或 Disk 数据上。
 
-第一期建议只实现 `mysql_replication_hostgroups`，但页面模型和 Repository 接口应预留拓扑类型：
+### 阶段三：其他拓扑
 
-```csharp
-public enum HostgroupTopologyType
-{
-    Replication,
-    GroupReplication,
-    Galera
-}
-```
+Galera 已作为独立页面实现：
 
-进入页面时进行表存在性和列结构探测：
+- `mysql_galera_hostgroups`
+- 页面路由：`/mysql/galera-hostgroups`
+- 页面菜单名：Replication Hostgroups 与 Galera Hostgroups 分开显示
 
-- 表不存在：隐藏该拓扑类型，并显示“当前 ProxySQL 未提供此定义表”。
-- 表存在但字段不完整：显示兼容性错误，不使用猜测逻辑。
-- 表存在且可读取：加载定义和成员。
+后续仍可独立支持：
+
+- `mysql_group_replication_hostgroups`
+
+每种拓扑必须先探测表和列结构，再使用独立模型；不能把它们强行映射成 `mysql_replication_hostgroups` 的四列模型。
+
+### 阶段四：跨层差异
+
+如果确有需要，再增加 Main / Runtime / Disk 的差异计数和字段级详情。本阶段的三页签只负责可靠读取和展示，不要求跨层合并。
 
 ## 8. 验收标准
 
-- 新增 `/mysql/hostgroups` 页面。
-- 页面能够显示 `mysql_replication_hostgroups` 中的 writer、reader、backup writer 和 offline 映射。
-- 页面能够显示每个主机组的成员服务器。
-- 页面能明确说明 `10`、`20` 的角色来自哪一行配置，而不是把数字当作固定含义。
-- 未定义主机组和角色冲突能够被识别。
-- 可切换配置视图和 runtime 生效视图，并显示二者差异。
-- 现有服务器、用户、查询规则和查询摘要页面中的 Hostgroup 数字可以显示角色名称。
-- 所有 Hostgroup 查询集中在 Repository，页面不直接执行 SQL。
-- 在没有 `mysql_replication_hostgroups` 表或权限不足时，页面给出明确错误，不显示误导性的默认角色。
-- 第一阶段不允许从该页面直接修改 Hostgroup 定义，避免误触发读写拓扑切换。
+- 新增 `/mysql/hostgroups` 页面并出现在 MySQL 菜单。
+- 页面有 Main、Runtime、Disk 三个只读页签。
+- 每个页签读取同层级的定义表、成员表和 Monitor 变量。
+- 页面使用当前 ProxySQL 版本实际存在的四列定义 schema。
+- 能显示 Writer、Reader 和角色冲突，并排除未被定义引用的 Hostgroup。
+- 定义中有组但没有成员时显示“未配置成员”。
+- 没有定义行时显示明确的空配置状态。
+- 同一物理后端出现在不同 Writer/Reader 主机组时不误报为主机组 ID 冲突。
+- 表不存在、权限不足和查询失败显示错误，不伪造默认角色。
+- Hostgroup 查询集中在 Repository，页面不直接执行 SQL。
+- 不允许从 Hostgroups 页面修改拓扑定义，但允许在 Main 层编辑和删除已关联成员。
 
-## 9. 结论
-
-这个页面的重点不是显示一组数字，而是建立下面这条可解释关系：
+## 9. 关系示例
 
 ```text
 mysql_replication_hostgroups
-    -> 10 = writer_hostgroup
-    -> 20 = backup_writer_hostgroup
-    -> 30 = reader_hostgroup
+    -> writer_hostgroup = 10
+    -> reader_hostgroup = 30
 
 mysql_servers
-    -> hostgroup_id = 10 的后端是写组成员
-    -> hostgroup_id = 20 的后端是备用写组成员
-    -> hostgroup_id = 30 的后端是读组成员
-```
+    -> hostgroup_id = 10 的后端显示 Writer
+    -> hostgroup_id = 30 的后端显示 Reader
+    -> 未命中 10 或 30 的后端不属于该定义，不在本页面显示
 
-只有把“角色定义”和“实际成员”同时展示，用户才能理解 ProxySQL 的分组配置以及 `10`、`20` 为什么具有主写、备写语义。
+mysql-monitor_writer_is_also_reader = true
+    -> 同一个物理后端可以同时出现在 Writer 和 Reader 成员中
+    -> 不改变 10 和 30 各自的角色定义
+```
