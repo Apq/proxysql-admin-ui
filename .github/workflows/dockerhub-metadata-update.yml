@@ -1,0 +1,27 @@
+name: Update Docker Hub Page
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: dockerhub-metadata-update
+  cancel-in-progress: false
+
+jobs:
+  update-dockerhub-page:
+    name: Update Docker Hub description and overview
+    runs-on: ubuntu-latest
+    environment: dockerhub
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update Docker Hub repository metadata
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+          DOCKERHUB_NAMESPACE: amwpfiqvy
+          DOCKERHUB_REPOSITORY: proxysql-admin-ui
+        run: bash ./dockerHub/update-dockerhub.sh
