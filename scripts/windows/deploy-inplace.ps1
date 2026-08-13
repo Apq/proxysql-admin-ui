@@ -94,7 +94,7 @@ function Publish-Staging {
 }
 
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-    throw ".NET SDK was not found in PATH. Install the .NET 8 SDK first."
+        throw ".NET SDK was not found in PATH. Install the .NET 10 SDK first."
 }
 
 Write-Host "Project root: $ProjectRoot"

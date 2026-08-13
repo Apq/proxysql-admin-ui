@@ -58,7 +58,13 @@
     private IEnumerable<IdentityError>? identityErrors;
 
     [SupplyParameterFromForm]
-    private InputModel Input { get; set; } = new();
+    private InputModel Input
+    {
+        get => input ??= new();
+        set => input = value;
+    }
+
+    private InputModel? input;
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }

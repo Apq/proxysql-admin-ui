@@ -369,7 +369,9 @@
 
     private string GetHostgroupRole(int hostgroupId)
     {
-        if (_snapshot?.HostgroupRoles.TryGetValue(hostgroupId, out var roles) != true || roles.Count == 0)
+        if (_snapshot is null ||
+            !_snapshot.HostgroupRoles.TryGetValue(hostgroupId, out var roles) ||
+            roles.Count == 0)
         {
             return L["Undefined"];
         }

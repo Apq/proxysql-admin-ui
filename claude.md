@@ -2,10 +2,10 @@
 
 ## Project Overview
 
-**ProxySQL Admin UI** is a modern web-based administration dashboard for managing ProxySQL (a high-performance MySQL proxy server). Built with .NET 8 and Blazor Server, it provides a user-friendly interface for monitoring performance, configuring backend servers, managing user credentials, and defining query routing rules.
+**ProxySQL Admin UI** is a modern web-based administration dashboard for managing ProxySQL (a high-performance MySQL proxy server). Built with .NET 10 and Blazor Server, it provides a user-friendly interface for monitoring performance, configuring backend servers, managing user credentials, and defining query routing rules.
 
 **License:** MIT
-**Primary Language:** C# (.NET 8)
+**Primary Language:** C# (.NET 10)
 **Web Framework:** Blazor Server with Radzen UI Components
 
 ## Quick Facts
@@ -21,7 +21,7 @@
 ## Technology Stack
 
 ### Core Framework
-- **.NET 8** - LTS version with Alpine Linux runtime
+- **.NET 10** - LTS version with Alpine Linux runtime
 - **ASP.NET Core** - Web framework
 - **Blazor Server** - Interactive server-side rendering
 - **Entity Framework Core 8.0.10** - ORM for data access
@@ -426,7 +426,7 @@ Client → ProxySQL (port 6033) → Backend MySQL Servers
 
 ### Official Documentation
 - ProxySQL: https://proxysql.com/documentation/
-- .NET 8: https://learn.microsoft.com/en-us/dotnet/
+- .NET 10: https://learn.microsoft.com/en-us/dotnet/
 - Blazor: https://learn.microsoft.com/en-us/aspnet/core/blazor
 - Radzen: https://blazor.radzen.com/
 
@@ -438,7 +438,7 @@ Client → ProxySQL (port 6033) → Backend MySQL Servers
 ## Version Information
 
 **Current Stack:**
-- .NET 8.0 (LTS)
+- .NET 10.0 (LTS)
 - Entity Framework Core 8.0.10
 - Radzen Blazor (latest)
 - ProxySQL 2.7.1 (via Docker)

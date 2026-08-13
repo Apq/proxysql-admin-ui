@@ -1,6 +1,6 @@
 # ProxySQL Admin UI
 
-ProxySQL Admin UI 是一个基于 Blazor Server 和 .NET 8 的 ProxySQL Web 管理界面。应用主要通过 ProxySQL Admin 接口读取配置和运行统计；启用 Galera 仲裁权重功能后，会使用独立凭据直连 ProxySQL Runtime Galera 拓扑中的节点。
+ProxySQL Admin UI 是一个基于 Blazor Server 和 .NET 10 的 ProxySQL Web 管理界面。应用主要通过 ProxySQL Admin 接口读取配置和运行统计；启用 Galera 仲裁权重功能后，会使用独立凭据直连 ProxySQL Runtime Galera 拓扑中的节点。
 
 当前版本：`v0.6`
 

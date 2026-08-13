@@ -3,7 +3,7 @@
 ARG BUILD_CONFIGURATION=Release
 
 # Build stage — runs on native arch via buildx, cross-compiles to TARGETARCH
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 ARG BUILD_CONFIGURATION
 ARG TARGETARCH
 ARG APP_VERSION=0.0.0
@@ -37,7 +37,7 @@ RUN dotnet publish "./ProxysqlAdminUi.Web.csproj" \
       /p:InformationalVersion="$APP_VERSION"
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
 
 # Enable globalization and time zones
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \

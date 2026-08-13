@@ -40,7 +40,7 @@ A modern web interface for managing ProxySQL, built with Blazor and .NET Core.
 
 ## Tech Stack
 
-- ASP.NET Core (.NET 8)  
+- ASP.NET Core (.NET 10)
 - Blazor Server
 - Entity Framework Core
 - [Radzen Blazor Components](https://blazor.radzen.com/)
@@ -50,7 +50,7 @@ A modern web interface for managing ProxySQL, built with Blazor and .NET Core.
 
 ### Prerequisites
 
-- .NET 8 SDK
+- .NET 10 SDK
 - Running ProxySQL instance
 
 ### Configuration

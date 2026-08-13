@@ -1,6 +1,6 @@
 # ProxySQL Admin UI
 
-ProxySQL Admin UI 是一个基于 ASP.NET Core .NET 8 和 Blazor Server 的 ProxySQL 管理界面，用于查看和管理 ProxySQL 的后端服务器、用户、查询规则、查询摘要、全局变量和运行状态。
+ProxySQL Admin UI 是一个基于 ASP.NET Core .NET 10 和 Blazor Server 的 ProxySQL 管理界面，用于查看和管理 ProxySQL 的后端服务器、用户、查询规则、查询摘要、全局变量和运行状态。
 
 ## 功能
 
@@ -41,7 +41,7 @@ SAVE MYSQL SERVERS TO DISK;
 
 ## 技术栈
 
-- ASP.NET Core .NET 8
+- ASP.NET Core .NET 10
 - Blazor Server
 - Entity Framework Core
 - MySql.EntityFrameworkCore
@@ -52,7 +52,7 @@ SAVE MYSQL SERVERS TO DISK;
 
 ### 前置条件
 
-- .NET 8 SDK
+- .NET 10 SDK
 - 正在运行的 ProxySQL 实例
 - 可访问 ProxySQL Admin 端口的账号
 
