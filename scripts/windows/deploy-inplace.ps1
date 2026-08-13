@@ -1,6 +1,5 @@
 param(
-    [string]$ProxySqlConnectionString = "",
-    [string]$AdminPassword = ""
+    [string]$ProxySqlConnectionString = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,7 +9,6 @@ $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 if (-not $isAdmin) {
     $arguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $PSCommandPath)
     if ($ProxySqlConnectionString) { $arguments += "-ProxySqlConnectionString"; $arguments += $ProxySqlConnectionString }
-    if ($AdminPassword) { $arguments += "-AdminPassword"; $arguments += $AdminPassword }
     $elevated = Start-Process -FilePath "pwsh.exe" -ArgumentList $arguments -Verb RunAs -Wait -PassThru
     exit $elevated.ExitCode
 }
@@ -24,12 +22,6 @@ $LogsDir = Join-Path $ProjectRoot "logs"
 $WinswXml = Join-Path $PSScriptRoot "ProxySQL-Admin-UI.xml"
 $WinswXmlExample = Join-Path $PSScriptRoot "ProxySQL-Admin-UI.xml.example"
 . (Join-Path $PSScriptRoot "service-common.ps1")
-
-function New-UrlSafePassword {
-    $bytes = [byte[]]::new(18)
-    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-    return [Convert]::ToBase64String($bytes).Replace("+", "-").Replace("/", "_")
-}
 
 function Convert-ToXmlAttributeValue {
     param([Parameter(Mandatory)] [string]$Value)
@@ -49,23 +41,11 @@ function Initialize-ServiceConfiguration {
         throw "First deployment requires -ProxySqlConnectionString. No default ProxySQL credentials will be used."
     }
 
-    $generatedPassword = $false
-    if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
-        $AdminPassword = New-UrlSafePassword
-        $generatedPassword = $true
-    }
-
     $xml = Get-Content -LiteralPath $WinswXmlExample -Raw
     $xml = $xml.Replace('$(PROXYSQL_CONNECTION_STRING)', (Convert-ToXmlAttributeValue $ProxySqlConnectionString))
-    $xml = $xml.Replace('$(ADMIN_PASSWORD)', (Convert-ToXmlAttributeValue $AdminPassword))
     [IO.File]::WriteAllText($WinswXml, $xml, [Text.UTF8Encoding]::new($false))
 
     Write-Host "Created local service configuration: $WinswXml"
-    if ($generatedPassword) {
-        Write-Host "Initial web username: admin"
-        Write-Host "Initial web password: $AdminPassword"
-        Write-Host "Store this password now. Existing identity data is kept in data\db\app.db."
-    }
 }
 
 function Invoke-Publish {

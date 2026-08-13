@@ -26,7 +26,6 @@ docker run -d --restart unless-stopped \
   -p 8001:8001 \
   -e PAI_ConnectionStrings__ProxySqlContext='Server=host.docker.internal;Port=6032;Uid=radmin;Pwd=CHANGE_ME;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;' \
   -e PAI_DefaultUsers__0__Username=admin \
-  -e PAI_DefaultUsers__0__Password=CHANGE_ME_TOO \
   amwpfiqvy/proxysql-admin-ui:latest
 ```
 
@@ -46,8 +45,9 @@ services:
       ASPNETCORE_URLS: http://+:8001
       PAI_ConnectionStrings__ProxySqlContext: Server=proxysql;Port=6032;Uid=radmin;Pwd=CHANGE_ME;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;
       PAI_DefaultUsers__0__Username: admin
-      PAI_DefaultUsers__0__Password: CHANGE_ME_TOO
 ```
+
+When the identity database has no users, the application generates a random 14-character initial password using only letters, digits, `_`, and `%`. The login page displays the initial credential until the user changes the password.
 
 ## 配置项
 
@@ -55,7 +55,6 @@ services:
 |---|---|
 | `PAI_ConnectionStrings__ProxySqlContext` | ProxySQL Admin 连接字符串 |
 | `PAI_DefaultUsers__0__Username` | 首次创建的 Web 管理员用户名 |
-| `PAI_DefaultUsers__0__Password` | 首次创建的 Web 管理员密码 |
 | `ASPNETCORE_URLS` | Web 监听地址，镜像默认使用 `8001` 端口 |
 
 Web 管理员身份数据库存放在应用数据目录中。需要在替换容器后保留用户数据时，请将持久化卷挂载到 `/app/data`。

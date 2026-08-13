@@ -483,6 +483,172 @@ GROUP BY r.rule_id, r.active, r.username, r.schemaname, r.flagIN, r.client_addr,
         return metrics.ToDictionary(x => x.VariableName, x => x.VariableValue);
     }
 
+    public async Task<IReadOnlyList<StatsMySqlConnectionPoolModel>> GetMySqlConnectionPool(
+        int? hostgroupId = null)
+    {
+        await using var context = await CreateContextAsync();
+        var availableColumns = await GetTableColumnsAsync(context, "stats_mysql_connection_pool");
+        var latencyExpression = availableColumns.Contains("Latency_ms")
+            ? "Latency_ms"
+            : availableColumns.Contains("Latency_us")
+                ? "CAST(Latency_us / 1000 AS INTEGER)"
+                : "0";
+        var columns = $@"SELECT hostgroup AS Hostgroup,
+                                        srv_host AS ServerHost,
+                                        srv_port AS ServerPort,
+                                        status AS Status,
+                                        ConnUsed,
+                                        ConnFree,
+                                        ConnOK AS ConnOk,
+                                        ConnERR AS ConnErr,
+                                        Queries,
+                                        Bytes_data_sent AS BytesDataSent,
+                                        Bytes_data_recv AS BytesDataRecv,
+                                        {latencyExpression} AS LatencyMs
+                                 FROM stats_mysql_connection_pool";
+        var sql = hostgroupId.HasValue
+            ? $"{columns} WHERE hostgroup = {{0}} ORDER BY hostgroup, srv_host, srv_port"
+            : $"{columns} ORDER BY hostgroup, srv_host, srv_port";
+
+        return hostgroupId.HasValue
+            ? await context.StatsMySqlConnectionPool.FromSqlRaw(sql, hostgroupId.Value).AsNoTracking().ToListAsync()
+            : await context.StatsMySqlConnectionPool.FromSqlRaw(sql).AsNoTracking().ToListAsync();
+    }
+
+    private static async Task<HashSet<string>> GetTableColumnsAsync(
+        ProxySqlContext context,
+        string tableName)
+    {
+        var connection = context.Database.GetDbConnection();
+        var shouldClose = connection.State != ConnectionState.Open;
+        if (shouldClose)
+        {
+            await connection.OpenAsync();
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"SELECT * FROM {tableName} LIMIT 0";
+            await using var reader = await command.ExecuteReaderAsync();
+            var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var index = 0; index < reader.FieldCount; index++)
+            {
+                columns.Add(reader.GetName(index));
+            }
+
+            return columns;
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    public async Task<PagedResult<StatsMySqlProcesslistModel>> GetMySqlProcesslistPage(
+        int skip,
+        int pageSize,
+        int? hostgroupId = null,
+        string? sortProperty = null,
+        bool sortDescending = true)
+    {
+        await using var context = await CreateContextAsync();
+        var safeSkip = Math.Max(0, skip);
+        var safePageSize = Math.Clamp(pageSize, 1, 200);
+        var orderColumn = GetProcesslistOrderColumn(sortProperty);
+        var orderDirection = sortDescending ? "DESC" : "ASC";
+        var whereClause = hostgroupId.HasValue ? $" WHERE hostgroup = {hostgroupId.Value}" : string.Empty;
+
+        var connection = context.Database.GetDbConnection();
+        var shouldClose = connection.State != ConnectionState.Open;
+        if (shouldClose)
+        {
+            await connection.OpenAsync();
+        }
+
+        int totalCount;
+        try
+        {
+            await using var countCommand = connection.CreateCommand();
+            countCommand.CommandText = $"SELECT COUNT(*) FROM stats_mysql_processlist{whereClause}";
+            totalCount = Convert.ToInt32(await countCommand.ExecuteScalarAsync());
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+
+        const string columns = @"SELECT ThreadID AS ThreadId,
+                                        SessionID AS SessionId,
+                                        COALESCE(user, '') AS User,
+                                        COALESCE(db, '') AS Database,
+                                        COALESCE(cli_host, '') AS ClientHost,
+                                        COALESCE(cli_port, 0) AS ClientPort,
+                                        COALESCE(hostgroup, -1) AS Hostgroup,
+                                        COALESCE(l_srv_host, '') AS LocalServerHost,
+                                        COALESCE(l_srv_port, 0) AS LocalServerPort,
+                                        COALESCE(srv_host, '') AS ServerHost,
+                                        COALESCE(srv_port, 0) AS ServerPort,
+                                        COALESCE(command, '') AS Command,
+                                        COALESCE(time_ms, 0) AS TimeMs,
+                                        COALESCE(status_flags, 0) AS StatusFlags,
+                                        COALESCE(info, '') AS Info
+                                 FROM stats_mysql_processlist";
+        var sql = $"{columns}{whereClause} ORDER BY {orderColumn} {orderDirection} LIMIT {safePageSize} OFFSET {safeSkip}";
+        var items = await context.StatsMySqlProcesslist
+            .FromSqlRaw(sql)
+            .AsNoTracking()
+            .ToListAsync();
+
+        return new PagedResult<StatsMySqlProcesslistModel>
+        {
+            Items = items,
+            TotalCount = totalCount
+        };
+    }
+
+    private static string GetProcesslistOrderColumn(string? property) => property switch
+    {
+        nameof(StatsMySqlProcesslistModel.ThreadId) => "ThreadID",
+        nameof(StatsMySqlProcesslistModel.SessionId) => "SessionID",
+        nameof(StatsMySqlProcesslistModel.User) => "user",
+        nameof(StatsMySqlProcesslistModel.Database) => "db",
+        nameof(StatsMySqlProcesslistModel.ClientHost) => "cli_host",
+        nameof(StatsMySqlProcesslistModel.ClientPort) => "cli_port",
+        nameof(StatsMySqlProcesslistModel.Hostgroup) => "hostgroup",
+        nameof(StatsMySqlProcesslistModel.ServerHost) => "srv_host",
+        nameof(StatsMySqlProcesslistModel.ServerPort) => "srv_port",
+        nameof(StatsMySqlProcesslistModel.Command) => "command",
+        nameof(StatsMySqlProcesslistModel.StatusFlags) => "status_flags",
+        _ => "time_ms"
+    };
+
+    public async Task<ConnectionTopologySnapshotViewModel> GetConnectionTopologySnapshot(
+        int? hostgroupId = null)
+    {
+        var globalStats = await GetMySqlGlobalStats();
+        var connectionPool = await GetMySqlConnectionPool(hostgroupId);
+        var runtimeServers = (await GetMySqlServers(ProxySqlConfigLayer.Runtime))
+            .Where(server => !hostgroupId.HasValue || server.HostgroupId == hostgroupId.Value)
+            .ToList();
+        var hostgroupRoles = await GetRuntimeHostgroupRoles();
+
+        return new ConnectionTopologySnapshotViewModel
+        {
+            GlobalStats = globalStats,
+            ConnectionPool = connectionPool,
+            RuntimeServers = runtimeServers,
+            HostgroupRoles = hostgroupRoles,
+            CollectedAt = DateTimeOffset.Now
+        };
+    }
+
     public async Task ResetStats()
     {
         await using var context = await CreateContextAsync();
@@ -510,6 +676,57 @@ GROUP BY r.rule_id, r.active, r.username, r.schemaname, r.flagIN, r.client_addr,
     private Task<ProxySqlContext> CreateContextAsync()
     {
         return dbContextFactory.CreateDbContextAsync();
+    }
+
+    private async Task<IReadOnlyDictionary<int, IReadOnlyList<HostgroupRole>>> GetRuntimeHostgroupRoles()
+    {
+        var roles = new Dictionary<int, HashSet<HostgroupRole>>();
+
+        try
+        {
+            foreach (var definition in await GetMySqlReplicationHostgroups(ProxySqlConfigLayer.Runtime))
+            {
+                AddHostgroupRole(roles, definition.WriterHostgroup, HostgroupRole.Writer);
+                AddHostgroupRole(roles, definition.ReaderHostgroup, HostgroupRole.Reader);
+            }
+        }
+        catch
+        {
+            // A topology table can be unavailable on a supported ProxySQL deployment.
+        }
+
+        try
+        {
+            foreach (var definition in await GetMySqlGaleraHostgroups(ProxySqlConfigLayer.Runtime))
+            {
+                AddHostgroupRole(roles, definition.WriterHostgroup, HostgroupRole.Writer);
+                AddHostgroupRole(roles, definition.BackupWriterHostgroup, HostgroupRole.BackupWriter);
+                AddHostgroupRole(roles, definition.ReaderHostgroup, HostgroupRole.Reader);
+                AddHostgroupRole(roles, definition.OfflineHostgroup, HostgroupRole.Offline);
+            }
+        }
+        catch
+        {
+            // A topology table can be unavailable on a supported ProxySQL deployment.
+        }
+
+        return roles.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyList<HostgroupRole>)pair.Value.OrderBy(role => role).ToArray());
+    }
+
+    private static void AddHostgroupRole(
+        IDictionary<int, HashSet<HostgroupRole>> roles,
+        int hostgroupId,
+        HostgroupRole role)
+    {
+        if (!roles.TryGetValue(hostgroupId, out var assignedRoles))
+        {
+            assignedRoles = [];
+            roles[hostgroupId] = assignedRoles;
+        }
+
+        assignedRoles.Add(role);
     }
 
     private static async Task ApplyMySqlServersAsync(ProxySqlContext context)

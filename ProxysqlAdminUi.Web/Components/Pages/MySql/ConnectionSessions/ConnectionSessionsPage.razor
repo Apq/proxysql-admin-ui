@@ -1,0 +1,289 @@
+@page "/mysql/connection-sessions"
+
+@using ProxysqlAdminUi.Web.Models
+@using ProxysqlAdminUi.Web.Repositories
+
+@attribute [Authorize]
+
+@inject ProxySqlRepository ProxySqlRepository
+@inject LocalizationService L
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="8" SizeSM="12">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1">@L["Connection Details"]</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2">@L["Frontend session to backend binding relationships"]</RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="4" SizeSM="12">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton Text='@L["Connection overview"]' Icon="dns" ButtonStyle="ButtonStyle.Light"
+                              Click='@(() => NavigationManager.NavigateTo(GetConnectionPoolUrl()))' />
+                @if (HostgroupId.HasValue)
+                {
+                    <RadzenButton Text='@($"{L["Hostgroup"]}: {HostgroupId}")' Icon="filter_alt_off"
+                                  ButtonStyle="ButtonStyle.Light" Click="ClearHostgroupFilterAsync" />
+                }
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow AlignItems="AlignItems.Center" class="connection-session-toolbar">
+        <RadzenColumn Size="8" SizeSM="12">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenButton Text='@L["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Primary"
+                              Click="RefreshGridAsync" Disabled="@_loading" />
+            </RadzenStack>
+        </RadzenColumn>
+        <RadzenColumn Size="4" SizeSM="12">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@GetTotalRecordsText()" />
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+    @if (_error is not null)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger">@_error</RadzenAlert>
+    }
+
+    <div class="connection-session-grid" aria-busy="@ShowLoadingOverlay">
+        @if (ShowLoadingOverlay)
+        {
+            <RadzenStack AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center" Gap="1rem"
+                         class="connection-session-loading" role="status" aria-live="polite">
+                <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+                <RadzenText TextStyle="TextStyle.Body1">@L["Querying connection sessions..."]</RadzenText>
+            </RadzenStack>
+        }
+
+        <div class="@(ShowLoadingOverlay ? "connection-session-grid-content is-loading" : "connection-session-grid-content")"
+             aria-hidden="@ShowLoadingOverlay">
+            <RadzenDataGrid @ref="_grid" TItem="StatsMySqlProcesslistModel"
+                        Data="@_sessions" Count="@_totalCount" LoadData="LoadSessionsAsync"
+                        AllowPaging="true" AllowSorting="true" AllowFiltering="false"
+                        PageSize="@_pageSize" PageSizeOptions="@PageSizeOptions"
+                        PageSizeText='@L["Rows per page"]' PageSizeChanged="OnPageSizeChangedAsync"
+                        IsLoading="@_loading" PagerAlwaysVisible="true"
+                        EmptyText="@GetEmptyText()">
+            <Columns>
+            <RadzenDataGridColumn TItem="StatsMySqlProcesslistModel" Title='@L["Binding"]' Width="7rem"
+                                  Sortable="false" Filterable="false">
+                <Template Context="session">
+                    <RadzenBadge BadgeStyle="@(IsBound(session) ? BadgeStyle.Success : BadgeStyle.Light)"
+                                 Text='@(IsBound(session) ? L["Bound"] : L["Unbound"])' />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="StatsMySqlProcesslistModel" Property="@nameof(StatsMySqlProcesslistModel.ClientHost)"
+                                  Title='@L["Frontend client"]' Width="12rem">
+                <Template Context="session">@FormatEndpoint(session.ClientHost, session.ClientPort)</Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="StatsMySqlProcesslistModel" Property="@nameof(StatsMySqlProcesslistModel.User)"
+                                  Title='@L["Username"]' Width="9rem" />
+            <RadzenDataGridColumn TItem="StatsMySqlProcesslistModel" Property="@nameof(StatsMySqlProcesslistModel.Database)"
+                                  Title='@L["Database"]' Width="10rem" />
+            <RadzenDataGridColumn TItem="StatsMySqlProcesslistModel" Property="@nameof(StatsMySqlProcesslistModel.SessionId)"
+                                  Title='@L["Session ID"]' Width="9rem" />
+            <RadzenDataGridColumn TItem="StatsMySqlProcesslistModel" Property="@nameof(StatsMySqlProcesslistModel.ThreadId)"
+                                  Title='@L["Thread ID"]' Width="9rem" />
+            <RadzenDataGridColumn TItem="StatsMySqlProcesslistModel" Property="@nameof(StatsMySqlProcesslistModel.Hostgroup)"
+                                  Title='@L["Hostgroup"]' Width="8rem">
+                <Template Context="session">@(session.Hostgroup >= 0 ? session.Hostgroup.ToString() : "-")</Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="StatsMySqlProcesslistModel" Property="@nameof(StatsMySqlProcesslistModel.ServerHost)"
+                                  Title='@L["Backend MySQL"]' Width="12rem">
+                <Template Context="session">@(IsBound(session) ? FormatEndpoint(session.ServerHost, session.ServerPort) : "-")</Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="StatsMySqlProcesslistModel" Property="@nameof(StatsMySqlProcesslistModel.Command)"
+                                  Title='@L["Command"]' Width="8rem" />
+            <RadzenDataGridColumn TItem="StatsMySqlProcesslistModel" Property="@nameof(StatsMySqlProcesslistModel.TimeMs)"
+                                  Title='@L["Time (ms)"]' Width="9rem" />
+            <RadzenDataGridColumn TItem="StatsMySqlProcesslistModel" Property="@nameof(StatsMySqlProcesslistModel.StatusFlags)"
+                                  Title='@L["Status flags"]' Width="8rem" />
+            <RadzenDataGridColumn TItem="StatsMySqlProcesslistModel" Property="@nameof(StatsMySqlProcesslistModel.Info)"
+                                  Title='@L["Query"]' Width="26rem">
+                <Template Context="session">
+                    <span class="connection-query" title="@session.Info">@FormatQuery(session.Info)</span>
+                </Template>
+            </RadzenDataGridColumn>
+            </Columns>
+            </RadzenDataGrid>
+        </div>
+    </div>
+</RadzenStack>
+
+<style>
+    .connection-session-toolbar {
+        min-height: 2.5rem;
+    }
+
+    .connection-session-grid {
+        display: grid;
+        min-height: 20rem;
+    }
+
+    .connection-session-grid-content,
+    .connection-session-loading {
+        grid-area: 1 / 1;
+    }
+
+    .connection-session-grid-content.is-loading {
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    .connection-session-loading {
+        z-index: 1;
+        min-height: 20rem;
+    }
+
+    .connection-query {
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+</style>
+
+@code {
+    private const string PageSizeStorageKey = "proxysql-admin-ui-connection-sessions-page-size";
+    private const int DefaultPageSize = 20;
+    private static readonly IReadOnlyList<int> PageSizeOptions = [10, 20, 50, 100, 200];
+
+    [SupplyParameterFromQuery(Name = "hostgroupId")]
+    public int? HostgroupId { get; set; }
+
+    private RadzenDataGrid<StatsMySqlProcesslistModel>? _grid;
+    private IReadOnlyList<StatsMySqlProcesslistModel> _sessions = [];
+    private int _totalCount;
+    private int _pageSize = DefaultPageSize;
+    private bool _loading;
+    private bool _hasLoaded;
+    private string? _error;
+
+    private bool ShowLoadingOverlay => !_hasLoaded || _loading;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await LoadPageSizeAsync();
+        if (!_hasLoaded && !_loading)
+        {
+            await LoadSessionsAsync(new LoadDataArgs
+            {
+                Skip = 0,
+                Top = _pageSize
+            });
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadSessionsAsync(LoadDataArgs args)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        _loading = true;
+        _error = null;
+        try
+        {
+            var sort = args.Sorts?.FirstOrDefault();
+            var result = await ProxySqlRepository.GetMySqlProcesslistPage(
+                args.Skip ?? 0,
+                args.Top ?? _pageSize,
+                HostgroupId,
+                sort?.Property,
+                sort?.SortOrder != SortOrder.Ascending);
+
+            _sessions = result.Items;
+            _totalCount = result.TotalCount;
+        }
+        catch (Exception ex)
+        {
+            _sessions = [];
+            _totalCount = 0;
+            _error = $"{L["Failed to load connection details"]}: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            _hasLoaded = true;
+        }
+    }
+
+    private async Task RefreshGridAsync()
+    {
+        if (_grid is not null)
+        {
+            await _grid.Reload();
+        }
+    }
+
+    private async Task ClearHostgroupFilterAsync()
+    {
+        HostgroupId = null;
+        NavigationManager.NavigateTo("/mysql/connection-sessions", replace: true);
+        if (_grid is not null)
+        {
+            await _grid.FirstPage(forceReload: true);
+        }
+    }
+
+    private async Task OnPageSizeChangedAsync(int pageSize)
+    {
+        if (PageSizeOptions.Contains(pageSize))
+        {
+            _pageSize = pageSize;
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", PageSizeStorageKey, pageSize.ToString());
+        }
+    }
+
+    private async Task LoadPageSizeAsync()
+    {
+        var pageSize = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", PageSizeStorageKey);
+
+        if (int.TryParse(pageSize, out var savedPageSize) && PageSizeOptions.Contains(savedPageSize))
+        {
+            _pageSize = savedPageSize;
+        }
+    }
+
+    private static bool IsBound(StatsMySqlProcesslistModel session) =>
+        !string.IsNullOrWhiteSpace(session.ServerHost) && session.ServerPort > 0;
+
+    private static string FormatEndpoint(string host, int port) =>
+        string.IsNullOrWhiteSpace(host) ? "-" : $"{host}:{port}";
+
+    private static string FormatQuery(string query) =>
+        string.IsNullOrWhiteSpace(query) ? "-" : query;
+
+    private string GetEmptyText()
+    {
+        if (!_hasLoaded || _loading)
+        {
+            return L["Querying connection sessions..."];
+        }
+
+        return _error is null
+            ? L["No connection sessions found."]
+            : L["Connection sessions unavailable."];
+    }
+
+    private string GetTotalRecordsText() => !_hasLoaded
+        ? L["Querying..."]
+        : $"{L["Total records"]}: {_totalCount}";
+
+    private string GetConnectionPoolUrl() => HostgroupId.HasValue
+        ? $"/mysql/backend-connections?hostgroupId={HostgroupId.Value}"
+        : "/mysql/backend-connections";
+
+}

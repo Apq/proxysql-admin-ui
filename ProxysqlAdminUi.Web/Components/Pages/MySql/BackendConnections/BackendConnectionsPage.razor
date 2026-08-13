@@ -1,0 +1,339 @@
+@page "/mysql/backend-connections"
+@implements IDisposable
+
+@using ProxysqlAdminUi.Web.Models
+@using ProxysqlAdminUi.Web.Repositories
+@using ProxysqlAdminUi.Web.ViewModel
+
+@attribute [Authorize]
+
+@inject ProxySqlRepository ProxySqlRepository
+@inject LocalizationService L
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<RadzenStack Gap="1rem">
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="8">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1">@L["Connection Overview"]</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2">@L["Frontend to ProxySQL to backend connection topology"]</RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="4">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton Text='@L["View connection details"]' Icon="lan" ButtonStyle="ButtonStyle.Light"
+                              Click='@(() => NavigationManager.NavigateTo(GetConnectionSessionsUrl()))' />
+                @if (HostgroupId.HasValue)
+                {
+                    <RadzenButton Text='@($"{L["Hostgroup"]}: {HostgroupId}")' Icon="filter_alt" ButtonStyle="ButtonStyle.Light"
+                                  Click="ClearHostgroupFilterAsync" Disabled="@_loading" />
+                }
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow AlignItems="AlignItems.Center" class="refresh-controls">
+        <RadzenColumn Size="12">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenButton Text='@L["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Primary"
+                              Click="LoadAsync" Disabled="@_loading" />
+                <RadzenCheckBox TValue="bool" Value="@_autoRefresh" Name="AutoRefresh"
+                                Change="@((bool value) => OnAutoRefreshChangedAsync(value))" />
+                <RadzenLabel Text='@L["Auto refresh"]' Component="AutoRefresh" />
+                <RadzenNumeric TValue="int" Value="@_refreshIntervalSeconds" Change="OnRefreshIntervalChangedAsync"
+                               Min="5" Max="3600" Step="5" ShowUpDown="true" Disabled="@(!_autoRefresh)"
+                               Name="RefreshIntervalSeconds" Style="width: 7rem" aria-label='@L["Refresh interval"]' />
+                <RadzenText TextStyle="TextStyle.Body2">@L["seconds"]</RadzenText>
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+    @if (_loading && _snapshot is null)
+    {
+        <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+    }
+    else if (_error is not null)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger">@_error</RadzenAlert>
+    }
+    else if (_snapshot is not null)
+    {
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="6" SizeSM="12">
+                <RadzenCard class="topology-summary">
+                    <RadzenText TextStyle="TextStyle.Overline">@L["Frontend connections"]</RadzenText>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="connection-metrics">
+                        <RadzenStack Gap="0.125rem">
+                            <RadzenText TextStyle="TextStyle.H4">@GetFrontendTotal()</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2">@L["Total connections"]</RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Gap="0.125rem">
+                            <RadzenText TextStyle="TextStyle.H5">@GetFrontendActive()</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2">@L["Active connections"]</RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Gap="0.125rem">
+                            <RadzenText TextStyle="TextStyle.H5">@GetFrontendIdle()</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2">@L["Idle connections"]</RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="6" SizeSM="12">
+                <RadzenCard class="topology-summary">
+                    <RadzenText TextStyle="TextStyle.Overline">@L["Backend physical connections"]</RadzenText>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="connection-metrics">
+                        <RadzenStack Gap="0.125rem">
+                            <RadzenText TextStyle="TextStyle.H4">@GetBackendTotal()</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2">@L["Total connections"]</RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Gap="0.125rem">
+                            <RadzenText TextStyle="TextStyle.H5">@GetBackendUsed()</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2">@L["Used connections"]</RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Gap="0.125rem">
+                            <RadzenText TextStyle="TextStyle.H5">@GetBackendFree()</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Body2">@L["Idle connections"]</RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenRow AlignItems="AlignItems.Center">
+            <RadzenColumn Size="8">
+                <RadzenText TextStyle="TextStyle.Body2">
+                    @L["Collected at"]: @_snapshot.CollectedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss")
+                </RadzenText>
+            </RadzenColumn>
+            <RadzenColumn Size="4">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text='@($"{L["Runtime servers"]}: {_snapshot.RuntimeServers.Count}")' />
+                </RadzenStack>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenDataGrid TItem="StatsMySqlConnectionPoolModel" Data="@_snapshot.ConnectionPool"
+                        AllowPaging="true" AllowSorting="true" AllowFiltering="true" PageSize="20"
+                        EmptyText='@L["No backend connection pools found."]'>
+            <Columns>
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Property="@nameof(StatsMySqlConnectionPoolModel.Hostgroup)" Title='@L["Hostgroup"]' />
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Title='@L["Role"]' Filterable="false" Sortable="false">
+                    <Template Context="pool">@GetHostgroupRole(pool.Hostgroup)</Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Property="@nameof(StatsMySqlConnectionPoolModel.ServerHost)" Title='@L["Backend host"]' />
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Property="@nameof(StatsMySqlConnectionPoolModel.ServerPort)" Title='@L["Backend port"]' />
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Property="@nameof(StatsMySqlConnectionPoolModel.Status)" Title='@L["Status"]' />
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Title='@L["Max connections"]' Filterable="false" Sortable="false">
+                    <Template Context="pool">@GetMaxConnections(pool)</Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Property="@nameof(StatsMySqlConnectionPoolModel.ConnUsed)" Title='@L["ConnUsed"]' />
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Property="@nameof(StatsMySqlConnectionPoolModel.ConnFree)" Title='@L["ConnFree"]' />
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Property="@nameof(StatsMySqlConnectionPoolModel.ConnOk)" Title='@L["ConnOK"]' />
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Property="@nameof(StatsMySqlConnectionPoolModel.ConnErr)" Title='@L["ConnERR"]' />
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Property="@nameof(StatsMySqlConnectionPoolModel.Queries)" Title='@L["Queries"]' />
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Property="@nameof(StatsMySqlConnectionPoolModel.BytesDataSent)" Title='@L["Bytes sent"]' />
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Property="@nameof(StatsMySqlConnectionPoolModel.BytesDataRecv)" Title='@L["Bytes received"]' />
+                <RadzenDataGridColumn TItem="StatsMySqlConnectionPoolModel" Property="@nameof(StatsMySqlConnectionPoolModel.LatencyMs)" Title='@L["Latency (ms)"]' />
+            </Columns>
+        </RadzenDataGrid>
+    }
+</RadzenStack>
+
+<style>
+    .topology-summary {
+        min-height: 132px;
+    }
+
+    .refresh-controls {
+        min-height: 2.5rem;
+    }
+
+    .connection-metrics {
+        margin-top: 0.75rem;
+    }
+</style>
+
+@code {
+    private const string AutoRefreshStorageKey = "proxysql-admin-ui-backend-connections-auto-refresh";
+    private const string RefreshIntervalStorageKey = "proxysql-admin-ui-backend-connections-refresh-interval-seconds";
+    private const int DefaultRefreshIntervalSeconds = 30;
+    private const int MinimumRefreshIntervalSeconds = 5;
+    private const int MaximumRefreshIntervalSeconds = 3600;
+
+    [SupplyParameterFromQuery(Name = "hostgroupId")]
+    public int? HostgroupId { get; set; }
+
+    private ConnectionTopologySnapshotViewModel? _snapshot;
+    private string? _error;
+    private bool _loading;
+    private bool _autoRefresh = true;
+    private int _refreshIntervalSeconds = DefaultRefreshIntervalSeconds;
+    private CancellationTokenSource? _refreshCancellation;
+    private bool _disposed;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await LoadRefreshSettingsAsync();
+        StartAutoRefresh();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _snapshot = await ProxySqlRepository.GetConnectionTopologySnapshot(HostgroupId);
+        }
+        catch (Exception ex)
+        {
+            _error = $"{L["Failed to load connection overview"]}: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ClearHostgroupFilterAsync()
+    {
+        HostgroupId = null;
+        NavigationManager.NavigateTo("/mysql/backend-connections", replace: true);
+        await LoadAsync();
+    }
+
+    private async Task OnAutoRefreshChangedAsync(bool value)
+    {
+        _autoRefresh = value;
+        await SaveRefreshSettingsAsync();
+        StartAutoRefresh();
+    }
+
+    private async Task OnRefreshIntervalChangedAsync(int value)
+    {
+        _refreshIntervalSeconds = NormalizeRefreshInterval(value);
+        await SaveRefreshSettingsAsync();
+        StartAutoRefresh();
+    }
+
+    private async Task LoadRefreshSettingsAsync()
+    {
+        var autoRefresh = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", AutoRefreshStorageKey);
+        var interval = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", RefreshIntervalStorageKey);
+
+        if (bool.TryParse(autoRefresh, out var savedAutoRefresh))
+        {
+            _autoRefresh = savedAutoRefresh;
+        }
+
+        if (int.TryParse(interval, out var savedInterval))
+        {
+            _refreshIntervalSeconds = NormalizeRefreshInterval(savedInterval);
+        }
+
+    }
+
+    private async Task SaveRefreshSettingsAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", AutoRefreshStorageKey, _autoRefresh.ToString());
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", RefreshIntervalStorageKey, _refreshIntervalSeconds.ToString());
+    }
+
+    private void StartAutoRefresh()
+    {
+        _refreshCancellation?.Cancel();
+        _refreshCancellation?.Dispose();
+        _refreshCancellation = null;
+
+        if (!_autoRefresh || _disposed)
+        {
+            return;
+        }
+
+        _refreshCancellation = new CancellationTokenSource();
+        _ = RunAutoRefreshAsync(_refreshCancellation.Token);
+    }
+
+    private async Task RunAutoRefreshAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_refreshIntervalSeconds));
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (!_loading)
+                {
+                    await InvokeAsync(LoadAsync);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Refresh settings changed or the page was disposed.
+        }
+    }
+
+    private static int NormalizeRefreshInterval(int interval) =>
+        Math.Clamp(interval, MinimumRefreshIntervalSeconds, MaximumRefreshIntervalSeconds);
+
+    private string GetConnectionSessionsUrl() => HostgroupId.HasValue
+        ? $"/mysql/connection-sessions?hostgroupId={HostgroupId.Value}"
+        : "/mysql/connection-sessions";
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _refreshCancellation?.Cancel();
+        _refreshCancellation?.Dispose();
+    }
+
+    private string GetStat(string name) =>
+        _snapshot?.GlobalStats.TryGetValue(name, out var value) == true ? value : "0";
+
+    private long GetStatValue(string name) =>
+        long.TryParse(GetStat(name), out var value) ? value : 0;
+
+    private long GetFrontendTotal() => GetStatValue("Client_Connections_connected");
+
+    private long GetFrontendActive() => GetStatValue("Client_Connections_non_idle");
+
+    private long GetFrontendIdle() => Math.Max(0, GetFrontendTotal() - GetFrontendActive());
+
+    private long GetBackendUsed() => _snapshot?.ConnectionPool.Sum(item => item.ConnUsed) ?? 0;
+
+    private long GetBackendFree() => _snapshot?.ConnectionPool.Sum(item => item.ConnFree) ?? 0;
+
+    private long GetBackendTotal() => GetBackendUsed() + GetBackendFree();
+
+    private string GetHostgroupRole(int hostgroupId)
+    {
+        if (_snapshot?.HostgroupRoles.TryGetValue(hostgroupId, out var roles) != true || roles.Count == 0)
+        {
+            return L["Undefined"];
+        }
+
+        return string.Join(", ", roles.Select(role => L[GetRoleKey(role)]));
+    }
+
+    private static string GetRoleKey(HostgroupRole role) => role switch
+    {
+        HostgroupRole.Writer => "Writer",
+        HostgroupRole.BackupWriter => "Backup writer",
+        HostgroupRole.Reader => "Reader",
+        HostgroupRole.Offline => "Offline",
+        _ => "Undefined"
+    };
+
+    private string GetMaxConnections(StatsMySqlConnectionPoolModel pool) =>
+        _snapshot?.RuntimeServers.FirstOrDefault(server =>
+            server.HostgroupId == pool.Hostgroup &&
+            string.Equals(server.Hostname, pool.ServerHost, StringComparison.OrdinalIgnoreCase) &&
+            server.Port == pool.ServerPort)?.MaxConnections.ToString() ?? "-";
+}

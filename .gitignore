@@ -357,3 +357,4 @@ data/
 logs/
 scripts/windows/ProxySQL-Admin-UI.xml
 scripts/windows/ProxySQL-Admin-UI.exe
+.cowork-temp

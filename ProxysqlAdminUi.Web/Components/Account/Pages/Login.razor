@@ -10,6 +10,7 @@
 @inject IdentityRedirectManager RedirectManager
 @inject AppVersion AppVersion
 @inject LocalizationService L
+@inject InitialCredentialService InitialCredentialService
 
 <PageTitle>@L["Log in"]</PageTitle>
 <HeadContent>
@@ -20,6 +21,20 @@
         <section>
             <h2>@L["Log in to ProxySql Admin UI"]</h2>
             <hr/>
+            @if (initialCredentials.Count > 0)
+            {
+                <div class="alert alert-warning" role="alert">
+                    <strong>@L["Initial login credentials"]</strong>
+                    <div>@L["Change the initial password immediately after signing in."]</div>
+                    @foreach (var credential in initialCredentials)
+                    {
+                        <div class="mt-2">
+                            @L["Username"]: <code>@credential.Username</code><br />
+                            @L["Initial password"]: <code>@credential.Password</code>
+                        </div>
+                    }
+                </div>
+            }
             <StatusMessage Message="@errorMessage"/>
             <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
                 <DataAnnotationsValidator/>
@@ -49,11 +64,12 @@
         <footer class="">
             <a href="@("https://github.com/Dotfinity/proxysql-admin-ui/releases/" + AppVersion.Version)">@AppVersion.Version</a>
         </footer>
-    </div> 
+    </div>
 </div>
 
 @code {
     private string? errorMessage;
+    private IReadOnlyList<InitialCredential> initialCredentials = [];
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -70,6 +86,7 @@
         {
             // Clear the existing external cookie to ensure a clean login process
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+            initialCredentials = await InitialCredentialService.GetCredentialsAsync();
         }
     }
 
@@ -103,7 +120,7 @@
     private sealed class InputModel
     {
         [Required]
-        
+
         public string Email { get; set; } = "";
 
         [Required]

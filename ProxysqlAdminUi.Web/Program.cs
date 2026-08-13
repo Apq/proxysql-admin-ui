@@ -15,7 +15,14 @@ var builder = WebApplication.CreateBuilder(args);
 #region Services
 
 builder.Configuration.AddJsonFile("appsettings.json", false)
-    .AddJsonFile($"appsettings.{Environments.Development}.json", true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true);
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddUserSecrets<Program>(optional: true);
+}
+
+builder.Configuration
     .AddEnvironmentVariables("PAI_")
     .AddEnvironmentVariables();
 
@@ -71,6 +78,7 @@ builder.Services.AddOutputCache();
 
 builder.Services.AddScoped<DefaultUserSeedService>();
 builder.Services.AddScoped<LocalizationService>();
+builder.Services.AddSingleton<InitialCredentialService>();
 
 builder.Services.AddSingleton<AppVersion>();
 

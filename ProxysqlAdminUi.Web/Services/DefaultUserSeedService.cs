@@ -11,7 +11,8 @@ public class DefaultUserSeedService(
     ProxysqlAdminUiWebAuthContext dbContext,
     IConfiguration configuration,
     ILogger<DefaultUserSeedService> logger,
-    UserManager<ProxysqlAdminUiWebUser> userManager)
+    UserManager<ProxysqlAdminUiWebUser> userManager,
+    InitialCredentialService initialCredentialService)
 {
     public async Task SeedDefaultUsersAsync()
     {
@@ -26,7 +27,6 @@ public class DefaultUserSeedService(
             }
 
             var existingUsers = await dbContext.Users.AnyAsync();
-            
             if (!existingUsers)
             {
                 var defaultUsers = configuration.GetSection("DefaultUsers")
@@ -34,13 +34,14 @@ public class DefaultUserSeedService(
 
                 foreach (var user in defaultUsers)
                 {
+                    var initialPassword = initialCredentialService.GeneratePassword();
 
                     var result = await userManager.CreateAsync(new ProxysqlAdminUiWebUser()
                     {
                         UserName = user.Username,
                         EmailConfirmed = true,
                         Email = user.Username+"@localhost"
-                    }, user.Password);
+                    }, initialPassword);
 
                     if (!result.Succeeded)
                     {
@@ -48,15 +49,20 @@ public class DefaultUserSeedService(
                         {
                             logger.LogCritical($"{error.Code}: {error.Description}");
                         }
+
+                        continue;
                     }
 
                     await dbContext.SaveChangesAsync();
                     var newUser = await userManager.Users.FirstAsync(x => x.UserName == user.Username);
-                     
+
                     var token = await userManager.GenerateEmailConfirmationTokenAsync(newUser);
-                     
+
                     await userManager.ConfirmEmailAsync(newUser, token);
-                    
+
+                    await initialCredentialService.AddCredentialAsync(
+                        new InitialCredential(user.Username, initialPassword));
+
                     logger.LogInformation($"Added default user: {user.Username}");
                 }
             }

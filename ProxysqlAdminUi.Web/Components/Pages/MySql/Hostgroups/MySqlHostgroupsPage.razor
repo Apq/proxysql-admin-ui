@@ -12,6 +12,7 @@
 @inject DialogService DialogService
 @inject NotificationService NotificationService
 @inject LocalizationService L
+@inject NavigationManager NavigationManager
 
 <RadzenStack Gap="1rem">
     <RadzenRow AlignItems="AlignItems.Center">
@@ -184,6 +185,17 @@
                                                     </Template>
                                                 </RadzenDataGridColumn>
                                             }
+                                            else if (layer == ProxySqlConfigLayer.Runtime)
+                                            {
+                                                <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                      Title='@L["Connections"]' Filterable="false" Sortable="false" Width="84px">
+                                                    <Template Context="member">
+                                                        <RadzenButton Icon="lan" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                                                      title='@L["View connection pool"]'
+                                                                      Click="@(() => ViewConnectionPool(member.HostgroupId))" />
+                                                    </Template>
+                                                </RadzenDataGridColumn>
+                                            }
                                         </Columns>
                                     </RadzenDataGrid>
                                 }
@@ -216,6 +228,9 @@
     }
 
     private Task RefreshCurrentLayerAsync() => LoadLayerAsync(CurrentLayer, force: true);
+
+    private void ViewConnectionPool(int hostgroupId) =>
+        NavigationManager.NavigateTo($"/mysql/backend-connections?hostgroupId={hostgroupId}");
 
     private async Task ReloadAfterMutationAsync()
     {

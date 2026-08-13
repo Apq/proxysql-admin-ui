@@ -16,4 +16,6 @@ public class ProxySqlContext(DbContextOptions<ProxySqlContext> options) : DbCont
 
     public DbSet<StatsMySqlGlobalModel> StatsMySqlGlobals { get; set; }
     public DbSet<StatsMemoryMetricsModel> StatsMemoryMetrics { get; set; }
+    public DbSet<StatsMySqlConnectionPoolModel> StatsMySqlConnectionPool { get; set; }
+    public DbSet<StatsMySqlProcesslistModel> StatsMySqlProcesslist { get; set; }
 }

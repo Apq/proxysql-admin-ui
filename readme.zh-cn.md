@@ -76,6 +76,8 @@ dotnet watch --project ProxysqlAdminUi.Web/ProxysqlAdminUi.Web.csproj
 
 默认监听地址为 `http://localhost:8001`。首次启动时，Web 管理员账号由 `DefaultUsers` 配置和本地 SQLite 数据库初始化。
 
+当身份数据库中没有用户时，应用会自动生成 14 位随机初始密码，字符范围为字母、数字、`_` 和 `%`。登录页面会显示初始账号和密码，用户修改密码成功后该提示自动移除。
+
 ### Docker 运行
 
 在 Docker Compose 或容器环境中设置连接串：
@@ -137,6 +139,8 @@ ProxySQL 的配置修改建议遵循以下顺序：
 - [ProxySQL 主机组定义显示设计](docs/mysql-replication-hostgroups-design.zh-CN.md)
 - [ProxySQL Galera 主机组显示设计](docs/mysql-galera-hostgroups-design.zh-CN.md)
 - [三类配置表支持方案](docs/three-table-support-plan.zh-CN.md)
+- [ProxySQL 前后端连接链路监控设计](docs/backend-connection-topology-monitor-design.zh-CN.md)
+- [ProxySQL 前后端连接链路监控实施步骤](docs/backend-connection-topology-monitor-implementation.zh-CN.md)
 
 ## 许可证
 

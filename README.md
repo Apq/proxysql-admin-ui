@@ -60,16 +60,17 @@ A modern web interface for managing ProxySQL, built with Blazor and .NET Core.
 1. Configure ProxySQL connection in `appsettings.json`:
 
 ```json
-"ConnectionStrings": {
+  "ConnectionStrings": {
     "ProxySqlContext": "Server=0.0.0.0;Port=6032;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;"
   },
   "DefaultUsers": [
     {
-      "Username": "admin",
-      "Password": "AdminAdminAdmin1"
+      "Username": "admin"
     }
   ]
 ```
+
+When the identity database has no users, the application generates a random 14-character initial password using only letters, digits, `_`, and `%`. The login page displays the initial credential until the user changes the password.
 
 2. Start the application:
 

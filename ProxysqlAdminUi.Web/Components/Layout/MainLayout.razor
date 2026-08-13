@@ -14,6 +14,8 @@
                 <RadzenMenuItem Text="@ServersText" Icon="dns" Path="/mysql/servers" />
                 <RadzenMenuItem Text="@GaleraHostgroupsText" Icon="hub" Path="/mysql/galera-hostgroups" />
                 <RadzenMenuItem Text="@ReplicationHostgroupsText" Icon="account_tree" Path="/mysql/replication-hostgroups" />
+                <RadzenMenuItem Text="@ConnectionOverviewText" Icon="account_tree" Path="/mysql/backend-connections" />
+                <RadzenMenuItem Text="@ConnectionDetailsText" Icon="lan" Path="/mysql/connection-sessions" />
                 <RadzenMenuItem Text="@RulesText" Icon="quiz" Path="/mysql/rules" />
                 <RadzenMenuItem Text="@DigestText" Icon="query_stats" Path="/mysql/queries/digest" />
                 <RadzenMenuItem Text="@VariablesText" Icon="settings" Path="/proxysql/global-variables" />
@@ -38,6 +40,8 @@
     private string ServersText => L["MySQL Servers"];
     private string ReplicationHostgroupsText => L["Replication Hostgroups"];
     private string GaleraHostgroupsText => L["Galera Hostgroups"];
+    private string ConnectionOverviewText => L["Connection Overview"];
+    private string ConnectionDetailsText => L["Connection Details"];
     private string RulesText => L["Rules"];
     private string DigestText => L["Query Digest"];
     private string VariablesText => L["Global Variables"];
