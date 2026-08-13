@@ -2,7 +2,7 @@
 
 ProxySQL Admin UI 是一个基于 Blazor Server 和 .NET 8 的 ProxySQL Web 管理界面。应用主要通过 ProxySQL Admin 接口读取配置和运行统计；启用 Galera 仲裁权重功能后，会使用独立凭据直连 ProxySQL Runtime Galera 拓扑中的节点。
 
-当前版本：`v0.4`
+当前版本：`v0.5`
 
 ## 功能
 
@@ -35,7 +35,7 @@ docker run -d --restart unless-stopped \
   -e APP_DB_PATH=/app/data \
   -e PAI_PROXYSQL='Server=host.docker.internal;Port=6032;Uid=radmin;Pwd=CHANGE_ME;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;' \
   -v proxysql-admin-ui-data:/app/data \
-  amwpfiqvy/proxysql-admin-ui:v0.4
+  amwpfiqvy/proxysql-admin-ui:v0.5
 ```
 
 启动后访问：`http://localhost:8001`
@@ -56,7 +56,7 @@ docker run -d --restart unless-stopped \
 ```yaml
 services:
   proxysql-admin-ui:
-    image: amwpfiqvy/proxysql-admin-ui:v0.4
+    image: amwpfiqvy/proxysql-admin-ui:v0.5
     container_name: proxysql-admin-ui
     restart: unless-stopped
     ports:
@@ -142,5 +142,5 @@ GET http://localhost:8001/health
 ## 相关链接
 
 - 源码：https://github.com/Apq/proxysql-admin-ui
-- 版本标签：https://github.com/Apq/proxysql-admin-ui/releases/tag/v0.4
+- 版本标签：https://github.com/Apq/proxysql-admin-ui/releases/tag/v0.5
 - 许可证：MIT
