@@ -1,4 +1,5 @@
 @page "/proxysql/global-variables"
+@inherits ConfigLayerTabsPageBase
 
 @using ProxysqlAdminUi.Web.Models
 @using ProxysqlAdminUi.Web.Repositories
@@ -110,28 +111,16 @@
 </RadzenStack>
 
 @code {
-    private static readonly ProxySqlConfigLayer[] ConfigLayers = Enum.GetValues<ProxySqlConfigLayer>();
     private readonly Dictionary<ProxySqlConfigLayer, List<GlobalVariableModel>> _variablesByLayer = [];
     private readonly HashSet<ProxySqlConfigLayer> _loadedLayers = [];
     private readonly HashSet<ProxySqlConfigLayer> _loadingLayers = [];
     private readonly Dictionary<string, string> _originalValues = [];
     private RadzenDataGrid<GlobalVariableModel>? _variablesGrid;
-    private int _selectedLayerIndex;
-
-    private ProxySqlConfigLayer CurrentLayer => ConfigLayers[_selectedLayerIndex];
     private bool IsCurrentLayerLoading => _loadingLayers.Contains(CurrentLayer);
-
-    protected override Task OnInitializedAsync() => LoadLayerAsync(ProxySqlConfigLayer.Main);
-
-    private async Task OnLayerChangedAsync(int index)
-    {
-        _selectedLayerIndex = index;
-        await LoadLayerAsync(CurrentLayer);
-    }
 
     private Task RefreshCurrentLayerAsync() => LoadLayerAsync(CurrentLayer, force: true);
 
-    private async Task LoadLayerAsync(ProxySqlConfigLayer layer, bool force = false)
+    protected override async Task LoadLayerAsync(ProxySqlConfigLayer layer, bool force = false)
     {
         if (!force && _loadedLayers.Contains(layer))
         {

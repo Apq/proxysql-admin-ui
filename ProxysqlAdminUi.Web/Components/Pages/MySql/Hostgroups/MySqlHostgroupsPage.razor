@@ -1,5 +1,6 @@
 @page "/mysql/hostgroups"
 @page "/mysql/replication-hostgroups"
+@inherits ConfigLayerTabsPageBase
 
 @using ProxysqlAdminUi.Web.Models
 @using ProxysqlAdminUi.Web.Repositories
@@ -12,7 +13,6 @@
 @inject DialogService DialogService
 @inject NotificationService NotificationService
 @inject LocalizationService L
-@inject NavigationManager NavigationManager
 
 <RadzenStack Gap="1rem">
     <RadzenRow AlignItems="AlignItems.Center">
@@ -209,23 +209,11 @@
 </RadzenStack>
 
 @code {
-    private static readonly ProxySqlConfigLayer[] ConfigLayers = Enum.GetValues<ProxySqlConfigLayer>();
     private readonly Dictionary<ProxySqlConfigLayer, HostgroupOverviewViewModel> _overviews = [];
     private readonly Dictionary<ProxySqlConfigLayer, string> _errors = [];
     private readonly HashSet<ProxySqlConfigLayer> _loadedLayers = [];
     private readonly HashSet<ProxySqlConfigLayer> _loadingLayers = [];
-    private int _selectedLayerIndex;
-
-    private ProxySqlConfigLayer CurrentLayer => ConfigLayers[_selectedLayerIndex];
     private bool IsCurrentLayerLoading => _loadingLayers.Contains(CurrentLayer);
-
-    protected override Task OnInitializedAsync() => LoadLayerAsync(ProxySqlConfigLayer.Main);
-
-    private async Task OnLayerChangedAsync(int index)
-    {
-        _selectedLayerIndex = index;
-        await LoadLayerAsync(CurrentLayer);
-    }
 
     private Task RefreshCurrentLayerAsync() => LoadLayerAsync(CurrentLayer, force: true);
 
@@ -295,7 +283,7 @@
         Width = "900px"
     };
 
-    private async Task LoadLayerAsync(ProxySqlConfigLayer layer, bool force = false)
+    protected override async Task LoadLayerAsync(ProxySqlConfigLayer layer, bool force = false)
     {
         if (!force && _loadedLayers.Contains(layer))
         {
