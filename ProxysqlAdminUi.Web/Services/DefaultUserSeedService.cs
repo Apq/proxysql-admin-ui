@@ -2,18 +2,18 @@
 using Microsoft.EntityFrameworkCore;
 using ProxysqlAdminUi.Web.Contexts;
 using ProxysqlAdminUi.Web.Data;
-using ProxysqlAdminUi.Web.Models;
 
 namespace ProxysqlAdminUi.Web.Services;
 
 
 public class DefaultUserSeedService(
     ProxysqlAdminUiWebAuthContext dbContext,
-    IConfiguration configuration,
     ILogger<DefaultUserSeedService> logger,
     UserManager<ProxysqlAdminUiWebUser> userManager,
     InitialCredentialService initialCredentialService)
 {
+    private const string DefaultUsername = "admin";
+
     public async Task SeedDefaultUsersAsync()
     {
         try
@@ -29,42 +29,36 @@ public class DefaultUserSeedService(
             var existingUsers = await dbContext.Users.AnyAsync();
             if (!existingUsers)
             {
-                var defaultUsers = configuration.GetSection("DefaultUsers")
-                    .Get<List<DefaultUserModel>>() ?? new List<DefaultUserModel>();
+                var initialPassword = initialCredentialService.GeneratePassword();
 
-                foreach (var user in defaultUsers)
+                var result = await userManager.CreateAsync(new ProxysqlAdminUiWebUser
                 {
-                    var initialPassword = initialCredentialService.GeneratePassword();
+                    UserName = DefaultUsername,
+                    EmailConfirmed = true,
+                    Email = DefaultUsername + "@localhost"
+                }, initialPassword);
 
-                    var result = await userManager.CreateAsync(new ProxysqlAdminUiWebUser()
+                if (!result.Succeeded)
+                {
+                    foreach (var error in result.Errors)
                     {
-                        UserName = user.Username,
-                        EmailConfirmed = true,
-                        Email = user.Username+"@localhost"
-                    }, initialPassword);
-
-                    if (!result.Succeeded)
-                    {
-                        foreach (var error in result.Errors)
-                        {
-                            logger.LogCritical($"{error.Code}: {error.Description}");
-                        }
-
-                        continue;
+                        logger.LogCritical($"{error.Code}: {error.Description}");
                     }
 
-                    await dbContext.SaveChangesAsync();
-                    var newUser = await userManager.Users.FirstAsync(x => x.UserName == user.Username);
-
-                    var token = await userManager.GenerateEmailConfirmationTokenAsync(newUser);
-
-                    await userManager.ConfirmEmailAsync(newUser, token);
-
-                    await initialCredentialService.AddCredentialAsync(
-                        new InitialCredential(user.Username, initialPassword));
-
-                    logger.LogInformation($"Added default user: {user.Username}");
+                    return;
                 }
+
+                await dbContext.SaveChangesAsync();
+                var newUser = await userManager.Users.FirstAsync(x => x.UserName == DefaultUsername);
+
+                var token = await userManager.GenerateEmailConfirmationTokenAsync(newUser);
+
+                await userManager.ConfirmEmailAsync(newUser, token);
+
+                await initialCredentialService.AddCredentialAsync(
+                    new InitialCredential(DefaultUsername, initialPassword));
+
+                logger.LogInformation($"Added default user: {DefaultUsername}");
             }
         }
         catch (Exception ex)

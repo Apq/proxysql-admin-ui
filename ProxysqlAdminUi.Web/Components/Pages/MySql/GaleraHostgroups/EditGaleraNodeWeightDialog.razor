@@ -1,0 +1,165 @@
+@using ProxysqlAdminUi.Web.ViewModel
+
+@attribute [Authorize]
+
+@inject GaleraNodeWeightService GaleraNodeWeightService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject LocalizationService L
+
+@if (_isLoading)
+{
+    <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
+        <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+        <RadzenText TextStyle="TextStyle.Body2">@L["Reading Galera node state..."]</RadzenText>
+    </RadzenStack>
+}
+else if (_node is not null)
+{
+    <RadzenStack Gap="1rem">
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Shade="Shade.Lighter" Variant="Variant.Flat">
+            @L["Changing Galera quorum weight can change which network partition remains Primary. This is not the ProxySQL routing weight."]
+        </RadzenAlert>
+
+        <RadzenCard>
+            <RadzenRow RowGap="0.75rem">
+                <RadzenColumn Size="6">
+                    <RadzenText><strong>@L["Server"]:</strong> @Hostname:@Port</RadzenText>
+                </RadzenColumn>
+                <RadzenColumn Size="6">
+                    <RadzenText><strong>@L["Galera node name"]:</strong> @_node.NodeName</RadzenText>
+                </RadzenColumn>
+                <RadzenColumn Size="6">
+                    <RadzenText><strong>@L["Galera cluster"]:</strong> @_node.ClusterName</RadzenText>
+                </RadzenColumn>
+                <RadzenColumn Size="6">
+                    <RadzenText><strong>@L["Cluster UUID"]:</strong> @_node.ClusterStateUuid</RadzenText>
+                </RadzenColumn>
+                <RadzenColumn Size="6">
+                    <RadzenText>
+                        <strong>@L["Current quorum weight"]:</strong> @_node.Weight
+                        @if (_node.IsDefaultWeight)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Light" Text='@L["Default value"]' class="rz-ml-1" />
+                        }
+                    </RadzenText>
+                </RadzenColumn>
+                <RadzenColumn Size="6">
+                    <RadzenText><strong>@L["Node state"]:</strong> @_node.ClusterStatus / @_node.LocalStateComment</RadzenText>
+                </RadzenColumn>
+            </RadzenRow>
+        </RadzenCard>
+
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+            <RadzenBadge BadgeStyle="@GetStateStyle(_node.WsrepOn)" Text="@($"WSREP {GetBooleanLabel(_node.WsrepOn)}")" />
+            <RadzenBadge BadgeStyle="@GetStateStyle(_node.Connected)" Text="@($"Connected {GetBooleanLabel(_node.Connected)}")" />
+            <RadzenBadge BadgeStyle="@GetStateStyle(_node.Ready)" Text="@($"Ready {GetBooleanLabel(_node.Ready)}")" />
+            <RadzenBadge BadgeStyle="@(_node.HasWritePrivilege is true ? BadgeStyle.Success : BadgeStyle.Info)"
+                         Text="@(_node.HasWritePrivilege is true ? L["Write privilege detected"] : L["Write privilege will be checked on change"])" />
+        </RadzenStack>
+
+        @if (!_node.IsHealthyForChange)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" Variant="Variant.Flat">
+                @L["The node must be Primary, Synced, Ready and Connected before its quorum weight can be changed."]
+            </RadzenAlert>
+        }
+        <RadzenFormField Text='@L["New quorum weight"]' Variant="Variant.Outlined">
+            <RadzenNumeric @bind-Value="_requestedWeight" Min="0" Max="255" Step="1"
+                           Disabled="@(!CanEdit)" Style="width: 100%" />
+        </RadzenFormField>
+
+        <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" Variant="Variant.Flat">
+            @L["This change affects only the running Galera process and may be lost after the node restarts."]
+        </RadzenAlert>
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.75rem">
+            <RadzenButton Text='@L["Cancel"]' Icon="close" ButtonStyle="ButtonStyle.Light"
+                          Click="@Cancel" Disabled="@_isSaving" />
+            <RadzenButton Text='@L["Change quorum weight"]' Icon="balance" ButtonStyle="ButtonStyle.Danger"
+                          Click="@ChangeWeightAsync" IsBusy="@_isSaving" Disabled="@(!CanSubmit)" />
+        </RadzenStack>
+    </RadzenStack>
+}
+
+@code {
+    [Parameter] public int HostgroupId { get; set; }
+    [Parameter] public string Hostname { get; set; } = string.Empty;
+    [Parameter] public int Port { get; set; }
+
+    private GaleraNodeWeightViewModel? _node;
+    private int _requestedWeight;
+    private bool _isLoading = true;
+    private bool _isSaving;
+
+    private bool CanEdit => _node is { IsHealthyForChange: true };
+    private bool CanSubmit =>
+        CanEdit &&
+        !_isSaving &&
+        _node is not null &&
+        _requestedWeight is >= 0 and <= 255 &&
+        _requestedWeight != _node.Weight;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _node = await GaleraNodeWeightService.InspectAsync(HostgroupId, Hostname, Port);
+            _requestedWeight = _node.Weight;
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, L["Failed to read Galera quorum weight"], ex.Message);
+            DialogService.Close(false);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ChangeWeightAsync()
+    {
+        if (_node is null || !CanSubmit)
+        {
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var username = authenticationState.User.Identity?.Name ?? "unknown";
+            var result = await GaleraNodeWeightService.ChangeWeightAsync(new GaleraWeightChangeRequest(
+                HostgroupId,
+                Hostname,
+                Port,
+                _node.NodeName,
+                _node.ClusterName,
+                _node.ClusterStateUuid,
+                _node.Weight,
+                _requestedWeight,
+                username));
+
+            _node = result.After;
+            NotificationService.Notify(
+                NotificationSeverity.Success,
+                L["Galera quorum weight changed"],
+                $"{Hostname}:{Port}: {result.Before.Weight} → {result.After.Weight}");
+            DialogService.Close(true);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, L["Failed to change Galera quorum weight"], ex.Message);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private string GetBooleanLabel(bool value) => value ? L["Yes"] : L["No"];
+    private static BadgeStyle GetStateStyle(bool value) => value ? BadgeStyle.Success : BadgeStyle.Danger;
+    private void Cancel() => DialogService.Close(false);
+}

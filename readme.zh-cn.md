@@ -58,14 +58,13 @@ SAVE MYSQL SERVERS TO DISK;
 
 ### 本地运行
 
-在 [appsettings.json](ProxysqlAdminUi.Web/appsettings.json) 或环境变量中配置 ProxySQL Admin 连接串：
+通过必需的 `PAI_PROXYSQL` 环境变量配置 ProxySQL Admin 连接串：
 
-```json
-{
-  "ConnectionStrings": {
-    "ProxySqlContext": "Server=127.0.0.1;Port=6032;Uid=admin;Pwd=CHANGE_ME;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;"
-  }
-}
+```powershell
+$env:PAI_PROXYSQL = 'Server=127.0.0.1;Port=6032;Uid=admin;Pwd=CHANGE_ME;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;'
+# 可选：启用 Galera 仲裁权重读取和调整
+$env:PAI_GALERA_USERNAME = 'galera_admin'
+$env:PAI_GALERA_PASSWORD = 'CHANGE_ME'
 ```
 
 启动应用：
@@ -74,7 +73,7 @@ SAVE MYSQL SERVERS TO DISK;
 dotnet watch --project ProxysqlAdminUi.Web/ProxysqlAdminUi.Web.csproj
 ```
 
-默认监听地址为 `http://localhost:8001`。首次启动时，Web 管理员账号由 `DefaultUsers` 配置和本地 SQLite 数据库初始化。
+默认监听地址为 `http://localhost:8001`。首次启动时，应用会在本地 SQLite 数据库中初始化固定用户名 `admin` 的 Web 管理员账号。
 
 当身份数据库中没有用户时，应用会自动生成 14 位随机初始密码，字符范围为字母、数字、`_` 和 `%`。登录页面会显示初始账号和密码，用户修改密码成功后该提示自动移除。
 
@@ -86,7 +85,7 @@ dotnet watch --project ProxysqlAdminUi.Web/ProxysqlAdminUi.Web.csproj
 environment:
   ASPNETCORE_ENVIRONMENT: Production
   ASPNETCORE_URLS: http://+:8001
-  PAI_ConnectionStrings__ProxySqlContext: Server=proxysql;Port=6032;Uid=admin;Pwd=CHANGE_ME;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;
+  PAI_PROXYSQL: Server=proxysql;Port=6032;Uid=admin;Pwd=CHANGE_ME;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;
 ```
 
 项目提供了 [docker/docker-compose.yaml](docker/docker-compose.yaml) 和 [docker/docker-compose-build.yaml](docker/docker-compose-build.yaml) 示例。

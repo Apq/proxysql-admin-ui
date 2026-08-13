@@ -6,7 +6,10 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: 'http://+:8001'
-      PAI_ConnectionStrings__ProxySqlContext: 'Server=proxysql;Port=6032;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;'
+      PAI_PROXYSQL: 'Server=proxysql;Port=6032;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;'
+      # Optional: credentials for direct Galera node quorum-weight management.
+      # PAI_GALERA_USERNAME: galera_admin
+      # PAI_GALERA_PASSWORD: CHANGE_ME
     logging:
       driver: "json-file"
       options:

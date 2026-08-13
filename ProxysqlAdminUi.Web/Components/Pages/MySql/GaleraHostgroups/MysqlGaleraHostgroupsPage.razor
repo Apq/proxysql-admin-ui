@@ -9,6 +9,7 @@
 @attribute [Authorize]
 
 @inject ProxySqlRepository ProxySqlRepository
+@inject GaleraNodeWeightService GaleraNodeWeightService
 @inject DialogService DialogService
 @inject NotificationService NotificationService
 @inject LocalizationService L
@@ -156,7 +157,44 @@
                                                                   Title='@L["Status"]' />
                                             <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
                                                                   Property="@nameof(HostgroupMemberViewModel.Weight)"
-                                                                  Title='@L["Weight"]' />
+                                                                  Title='@L["ProxySQL routing weight"]' />
+                                            @if (layer == ProxySqlConfigLayer.Runtime)
+                                            {
+                                                <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
+                                                                      Title='@L["Galera quorum weight"]' Filterable="false" Sortable="false">
+                                                    <Template Context="member">
+                                                        @if (member.Server is null)
+                                                        {
+                                                            <span>@L["Unavailable"]</span>
+                                                        }
+                                                        else if (!GaleraNodeWeightService.IsConfigured)
+                                                        {
+                                                            <span>@L["Not configured"]</span>
+                                                        }
+                                                        else if (_nodeWeightStates.TryGetValue(GetEndpointKey(member), out var nodeState))
+                                                        {
+                                                            @if (nodeState.IsLoading)
+                                                            {
+                                                                <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" Style="width: 20px; height: 20px" />
+                                                            }
+                                                            else if (nodeState.Node is not null)
+                                                            {
+                                                                <RadzenBadge BadgeStyle="@(nodeState.Node.IsHealthyForChange ? BadgeStyle.Success : BadgeStyle.Warning)"
+                                                                             Text="@nodeState.Node.Weight.ToString()" />
+                                                            }
+                                                            else
+                                                            {
+                                                                <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text='@L["Read failed"]'
+                                                                             title="@nodeState.Error" />
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>@L["Reading..."]</span>
+                                                        }
+                                                    </Template>
+                                                </RadzenDataGridColumn>
+                                            }
                                             <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
                                                                   Property="@nameof(HostgroupMemberViewModel.MaxConnections)"
                                                                   Title='@L["Max connections"]' />
@@ -173,7 +211,7 @@
                                                     <Template Context="member">
                                                         @if (member.Server is not null)
                                                         {
-                                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
                                                                 <RadzenButton Text='@L["Edit"]' Icon="edit" Size="ButtonSize.Small"
                                                                               Click="@(() => ShowEditModal(member))" />
                                                                 <RadzenButton Text='@L["Delete"]' Icon="delete" Size="ButtonSize.Small"
@@ -187,11 +225,21 @@
                                             else if (layer == ProxySqlConfigLayer.Runtime)
                                             {
                                                 <RadzenDataGridColumn TItem="HostgroupMemberViewModel"
-                                                                      Title='@L["Connections"]' Filterable="false" Sortable="false" Width="84px">
+                                                                      Title='@L["Actions"]' Filterable="false" Sortable="false" Width="220px">
                                                     <Template Context="member">
-                                                        <RadzenButton Icon="lan" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
-                                                                      title='@L["View connection pool"]'
-                                                                      Click="@(() => ViewConnectionPool(member.HostgroupId))" />
+                                                        @if (member.Server is not null)
+                                                        {
+                                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                                                                <RadzenButton Text='@L["Quorum weight"]' Icon="balance" Size="ButtonSize.Small"
+                                                                              ButtonStyle="ButtonStyle.Warning"
+                                                                              title='@L["View or change Galera quorum weight"]'
+                                                                              Disabled="@(!GaleraNodeWeightService.IsConfigured)"
+                                                                              Click="@(() => ShowGaleraWeightModal(member))" />
+                                                                <RadzenButton Icon="lan" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                                                              title='@L["View connection pool"]'
+                                                                              Click="@(() => ViewConnectionPool(member.HostgroupId))" />
+                                                            </RadzenStack>
+                                                        }
                                                     </Template>
                                                 </RadzenDataGridColumn>
                                             }
@@ -209,6 +257,7 @@
 
 @code {
     private readonly Dictionary<ProxySqlConfigLayer, GaleraHostgroupOverviewViewModel> _overviews = [];
+    private readonly Dictionary<string, GaleraNodeWeightRowState> _nodeWeightStates = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<ProxySqlConfigLayer, string> _errors = [];
     private readonly HashSet<ProxySqlConfigLayer> _loadedLayers = [];
     private readonly HashSet<ProxySqlConfigLayer> _loadingLayers = [];
@@ -249,6 +298,30 @@
         if (changed is true)
         {
             await ReloadAfterMutationAsync();
+        }
+    }
+
+    private async Task ShowGaleraWeightModal(HostgroupMemberViewModel member)
+    {
+        var server = member.Server;
+        if (server is null)
+        {
+            return;
+        }
+
+        var changed = await DialogService.OpenAsync<EditGaleraNodeWeightDialog>(
+            $"{L["Galera quorum weight"]}: {server.Hostname}:{server.Port}",
+            new Dictionary<string, object?>
+            {
+                [nameof(EditGaleraNodeWeightDialog.HostgroupId)] = server.HostgroupId,
+                [nameof(EditGaleraNodeWeightDialog.Hostname)] = server.Hostname,
+                [nameof(EditGaleraNodeWeightDialog.Port)] = server.Port
+            },
+            new DialogOptions { CloseDialogOnEsc = true, Width = "760px" });
+
+        if (changed is true)
+        {
+            await RefreshNodeWeightAsync(member);
         }
     }
 
@@ -295,6 +368,10 @@
         {
             _overviews[layer] = await ProxySqlRepository.GetGaleraHostgroupOverview(layer);
             _loadedLayers.Add(layer);
+            if (layer == ProxySqlConfigLayer.Runtime && GaleraNodeWeightService.IsConfigured)
+            {
+                await LoadNodeWeightsAsync(_overviews[layer]);
+            }
         }
         catch (Exception ex)
         {
@@ -312,6 +389,67 @@
 
     private GaleraHostgroupOverviewViewModel GetOverview(ProxySqlConfigLayer layer)
         => _overviews.GetValueOrDefault(layer) ?? new GaleraHostgroupOverviewViewModel();
+
+    private async Task LoadNodeWeightsAsync(GaleraHostgroupOverviewViewModel overview)
+    {
+        var members = overview.Members
+            .Where(member => member.Server is not null)
+            .GroupBy(GetEndpointKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
+
+        foreach (var member in members)
+        {
+            _nodeWeightStates[GetEndpointKey(member)] = GaleraNodeWeightRowState.Loading;
+        }
+
+        var tasks = members.Select(async member =>
+        {
+            var key = GetEndpointKey(member);
+            var server = member.Server!;
+            try
+            {
+                var node = await GaleraNodeWeightService.InspectAsync(
+                    server.HostgroupId,
+                    server.Hostname,
+                    server.Port);
+                _nodeWeightStates[key] = new GaleraNodeWeightRowState(false, node, null);
+            }
+            catch (Exception ex)
+            {
+                _nodeWeightStates[key] = new GaleraNodeWeightRowState(false, null, ex.Message);
+            }
+        });
+
+        await Task.WhenAll(tasks);
+    }
+
+    private async Task RefreshNodeWeightAsync(HostgroupMemberViewModel member)
+    {
+        var server = member.Server;
+        if (server is null)
+        {
+            return;
+        }
+
+        var key = GetEndpointKey(member);
+        _nodeWeightStates[key] = GaleraNodeWeightRowState.Loading;
+        try
+        {
+            var node = await GaleraNodeWeightService.InspectAsync(
+                server.HostgroupId,
+                server.Hostname,
+                server.Port);
+            _nodeWeightStates[key] = new GaleraNodeWeightRowState(false, node, null);
+        }
+        catch (Exception ex)
+        {
+            _nodeWeightStates[key] = new GaleraNodeWeightRowState(false, null, ex.Message);
+        }
+    }
+
+    private static string GetEndpointKey(HostgroupMemberViewModel member) =>
+        $"{member.Hostname}:{member.Port}";
 
     private string GetLayerLabel(ProxySqlConfigLayer layer) => layer switch
     {

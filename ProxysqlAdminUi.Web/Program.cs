@@ -64,7 +64,8 @@ builder.Services.AddIdentityCore<ProxysqlAdminUiWebUser>(options =>
 
 builder.SetupIdentityDbContext();
 
-var proxySqlConnectionString = builder.Configuration.GetConnectionString("ProxySqlContext") ?? throw new InvalidOperationException("Connection string 'ProxySqlContext' not found.");
+var proxySqlConnectionString = builder.Configuration["PROXYSQL"]
+    ?? throw new InvalidOperationException("ProxySQL connection string not found. Set PAI_PROXYSQL.");
 builder.Services.AddDbContextFactory<ProxySqlContext>(options =>
     options.UseMySQL(proxySqlConnectionString));
 
@@ -77,6 +78,7 @@ builder.Services.AddSingleton<IEmailSender<ProxysqlAdminUiWebUser>, IdentityNoOp
 builder.Services.AddOutputCache();
 
 builder.Services.AddScoped<DefaultUserSeedService>();
+builder.Services.AddScoped<GaleraNodeWeightService>();
 builder.Services.AddScoped<LocalizationService>();
 builder.Services.AddSingleton<InitialCredentialService>();
 

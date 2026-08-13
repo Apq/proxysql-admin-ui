@@ -57,17 +57,13 @@ A modern web interface for managing ProxySQL, built with Blazor and .NET Core.
 
 #### Local Configuration
 
-1. Configure ProxySQL connection in `appsettings.json`:
+1. Set the required `PAI_PROXYSQL` environment variable:
 
-```json
-  "ConnectionStrings": {
-    "ProxySqlContext": "Server=0.0.0.0;Port=6032;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;"
-  },
-  "DefaultUsers": [
-    {
-      "Username": "admin"
-    }
-  ]
+```bash
+export PAI_PROXYSQL='Server=127.0.0.1;Port=6032;Uid=radmin;Pwd=CHANGE_ME;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;'
+# Optional: enables Galera quorum-weight inspection and changes
+export PAI_GALERA_USERNAME='galera_admin'
+export PAI_GALERA_PASSWORD='CHANGE_ME'
 ```
 
 When the identity database has no users, the application generates a random 14-character initial password using only letters, digits, `_`, and `%`. The login page displays the initial credential until the user changes the password.
@@ -91,7 +87,10 @@ environment:
   ASPNETCORE_ENVIRONMENT: Production
   ASPNETCORE_URLS: 'http://+:8001'
   # Connection string for the ProxySQL Admin server
-  PAI_ConnectionStrings__ProxySqlContext: 'Server=xxxxxx;Port=6032;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;'
+  PAI_PROXYSQL: 'Server=xxxxxx;Port=6032;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;'
+  # Optional: credentials for direct Galera node quorum-weight management
+  PAI_GALERA_USERNAME: 'galera_admin'
+  PAI_GALERA_PASSWORD: 'CHANGE_ME'
 ```
 
 or if you're running the app and the ProxySQL server in the same docker-compose file, you can use the service name as the host:
@@ -101,7 +100,10 @@ environment:
   ASPNETCORE_ENVIRONMENT: Production
   ASPNETCORE_URLS: 'http://+:8001'
   # Connection string for the ProxySQL Admin server
-  PAI_ConnectionStrings__ProxySqlContext: 'Server=proxysql;Port=6032;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;'
+  PAI_PROXYSQL: 'Server=proxysql;Port=6032;Uid=radmin;Pwd=radmin;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;'
+  # Optional: credentials for direct Galera node quorum-weight management
+  PAI_GALERA_USERNAME: 'galera_admin'
+  PAI_GALERA_PASSWORD: 'CHANGE_ME'
 ```
 
 ## Random notes

@@ -302,7 +302,7 @@ docker build -f docker/Dockerfile \
 ### Environment Variables
 - `ASPNETCORE_ENVIRONMENT` - Development/Staging/Production
 - `ASPNETCORE_URLS` - Server binding (default: http://+:8000)
-- `PAI_ConnectionStrings__ProxySqlContext` - ProxySQL connection string
+- `PAI_PROXYSQL` - ProxySQL connection string
 - `APP_DB_PATH` - SQLite database location (default: /app/db/)
 - `BUILD_VERSION` - Version number (YYYY.MM.DD format)
 - `BUILD_SUFFIX` - Build identifier (GitHub run ID)

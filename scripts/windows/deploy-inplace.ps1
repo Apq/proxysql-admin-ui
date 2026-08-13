@@ -1,14 +1,22 @@
 param(
-    [string]$ProxySqlConnectionString = ""
+    [string]$ProxySqlConnectionString = "",
+    [string]$GaleraUsername = "",
+    [string]$GaleraPassword = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($GaleraUsername) -ne [string]::IsNullOrWhiteSpace($GaleraPassword)) {
+    throw "-GaleraUsername and -GaleraPassword must be provided together."
+}
 
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
     $arguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $PSCommandPath)
     if ($ProxySqlConnectionString) { $arguments += "-ProxySqlConnectionString"; $arguments += $ProxySqlConnectionString }
+    if ($GaleraUsername) { $arguments += "-GaleraUsername"; $arguments += $GaleraUsername }
+    if ($GaleraPassword) { $arguments += "-GaleraPassword"; $arguments += $GaleraPassword }
     $elevated = Start-Process -FilePath "pwsh.exe" -ArgumentList $arguments -Verb RunAs -Wait -PassThru
     exit $elevated.ExitCode
 }
@@ -43,6 +51,13 @@ function Initialize-ServiceConfiguration {
 
     $xml = Get-Content -LiteralPath $WinswXmlExample -Raw
     $xml = $xml.Replace('$(PROXYSQL_CONNECTION_STRING)', (Convert-ToXmlAttributeValue $ProxySqlConnectionString))
+    if ([string]::IsNullOrWhiteSpace($GaleraUsername) -or [string]::IsNullOrWhiteSpace($GaleraPassword)) {
+        $xml = $xml -replace '(?m)^\s*<env name="PAI_GALERA_USERNAME"[^>]*?/>(\r?\n)?', ''
+        $xml = $xml -replace '(?m)^\s*<env name="PAI_GALERA_PASSWORD"[^>]*?/>(\r?\n)?', ''
+    } else {
+        $xml = $xml.Replace('$(GALERA_USERNAME)', (Convert-ToXmlAttributeValue $GaleraUsername))
+        $xml = $xml.Replace('$(GALERA_PASSWORD)', (Convert-ToXmlAttributeValue $GaleraPassword))
+    }
     [IO.File]::WriteAllText($WinswXml, $xml, [Text.UTF8Encoding]::new($false))
 
     Write-Host "Created local service configuration: $WinswXml"
