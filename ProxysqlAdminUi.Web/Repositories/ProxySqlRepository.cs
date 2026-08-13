@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using ProxysqlAdminUi.Web.Contexts;
 using ProxysqlAdminUi.Web.Models;
@@ -8,6 +9,12 @@ namespace ProxysqlAdminUi.Web.Repositories;
 
 public class ProxySqlRepository(IDbContextFactory<ProxySqlContext> dbContextFactory)
 {
+    private static readonly SemaphoreSlim IdleBackendConnectionReleaseLock = new(1, 1);
+    private static readonly HashSet<string> RuntimeDerivedMySqlVariables = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "mysql-server_capabilities"
+    };
+
     private static readonly IReadOnlyDictionary<(ProxySqlConfigLayer Layer, ProxySqlConfigTable Table), string>
         ConfigTableMap = new Dictionary<(ProxySqlConfigLayer, ProxySqlConfigTable), string>
         {
@@ -513,6 +520,225 @@ GROUP BY r.rule_id, r.active, r.username, r.schemaname, r.flagIN, r.client_addr,
         return hostgroupId.HasValue
             ? await context.StatsMySqlConnectionPool.FromSqlRaw(sql, hostgroupId.Value).AsNoTracking().ToListAsync()
             : await context.StatsMySqlConnectionPool.FromSqlRaw(sql).AsNoTracking().ToListAsync();
+    }
+
+    public async Task<long> ReleaseIdleBackendConnections(
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(15);
+        if (effectiveTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeout), "The timeout must be greater than zero.");
+        }
+
+        await IdleBackendConnectionReleaseLock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var context = await CreateContextAsync();
+            var connection = context.Database.GetDbConnection();
+            var shouldClose = connection.State != ConnectionState.Open;
+            if (shouldClose)
+            {
+                await connection.OpenAsync(cancellationToken);
+            }
+
+            try
+            {
+                const string variableName = "mysql-free_connections_pct";
+                var mainValue = await GetRequiredVariableValueAsync(
+                    connection,
+                    "global_variables",
+                    variableName,
+                    cancellationToken);
+                var runtimeValue = await GetRequiredVariableValueAsync(
+                    connection,
+                    "runtime_global_variables",
+                    variableName,
+                    cancellationToken);
+                await EnsureOtherMySqlVariablesAreSynchronizedAsync(
+                    connection,
+                    variableName,
+                    cancellationToken);
+                var initialFreeConnections = await GetIdleBackendConnectionCountAsync(
+                    connection,
+                    cancellationToken);
+
+                if (initialFreeConnections == 0)
+                {
+                    return 0;
+                }
+
+                var runtimeLoadAttempted = false;
+                try
+                {
+                    await SetMainGlobalVariableAsync(connection, variableName, "0", cancellationToken);
+                    await EnsureOtherMySqlVariablesAreSynchronizedAsync(
+                        connection,
+                        variableName,
+                        cancellationToken);
+                    runtimeLoadAttempted = true;
+                    await ExecuteNonQueryAsync(connection, "LOAD MYSQL VARIABLES TO RUNTIME;", cancellationToken);
+
+                    var startedAt = DateTime.UtcNow;
+                    while (await GetIdleBackendConnectionCountAsync(connection, cancellationToken) > 0)
+                    {
+                        if (DateTime.UtcNow - startedAt >= effectiveTimeout)
+                        {
+                            throw new TimeoutException(
+                                $"ProxySQL did not release all idle backend connections within {effectiveTimeout.TotalSeconds:0} seconds.");
+                        }
+
+                        await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+                    }
+                }
+                finally
+                {
+                    if (runtimeLoadAttempted)
+                    {
+                        // Restore Runtime first, then restore Main without loading it so both layers
+                        // return to the values that existed before this temporary operation.
+                        try
+                        {
+                            await SetMainGlobalVariableAsync(connection, variableName, runtimeValue, CancellationToken.None);
+                            await ExecuteNonQueryAsync(connection, "LOAD MYSQL VARIABLES TO RUNTIME;", CancellationToken.None);
+                        }
+                        finally
+                        {
+                            await SetMainGlobalVariableAsync(connection, variableName, mainValue, CancellationToken.None);
+                        }
+                    }
+                    else
+                    {
+                        await SetMainGlobalVariableAsync(connection, variableName, mainValue, CancellationToken.None);
+                    }
+                }
+
+                return initialFreeConnections;
+            }
+            finally
+            {
+                if (shouldClose)
+                {
+                    await connection.CloseAsync();
+                }
+            }
+        }
+        finally
+        {
+            IdleBackendConnectionReleaseLock.Release();
+        }
+    }
+
+    private static async Task<string> GetRequiredVariableValueAsync(
+        DbConnection connection,
+        string tableName,
+        string variableName,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT variable_value FROM {tableName} WHERE variable_name = @variableName";
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "@variableName";
+        parameter.Value = variableName;
+        command.Parameters.Add(parameter);
+
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+        return value?.ToString()
+            ?? throw new InvalidOperationException(
+                $"ProxySQL variable '{variableName}' was not found in '{tableName}'.");
+    }
+
+    private static async Task SetMainGlobalVariableAsync(
+        DbConnection connection,
+        string variableName,
+        string value,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE global_variables SET variable_value = @value WHERE variable_name = @variableName";
+
+        var valueParameter = command.CreateParameter();
+        valueParameter.ParameterName = "@value";
+        valueParameter.Value = value;
+        command.Parameters.Add(valueParameter);
+
+        var nameParameter = command.CreateParameter();
+        nameParameter.ParameterName = "@variableName";
+        nameParameter.Value = variableName;
+        command.Parameters.Add(nameParameter);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task EnsureOtherMySqlVariablesAreSynchronizedAsync(
+        DbConnection connection,
+        string excludedVariableName,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+                              SELECT variable_name
+                              FROM (
+                                  SELECT m.variable_name
+                                  FROM global_variables m
+                                  LEFT JOIN runtime_global_variables r
+                                      ON r.variable_name = m.variable_name
+                                  WHERE m.variable_name LIKE 'mysql-%'
+                                    AND m.variable_name <> @excludedVariableName
+                                    AND (r.variable_name IS NULL OR r.variable_value <> m.variable_value)
+                                  UNION ALL
+                                  SELECT r.variable_name
+                                  FROM runtime_global_variables r
+                                  LEFT JOIN global_variables m
+                                      ON m.variable_name = r.variable_name
+                                  WHERE r.variable_name LIKE 'mysql-%'
+                                    AND r.variable_name <> @excludedVariableName
+                                    AND m.variable_name IS NULL
+                              ) differences
+                              """;
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "@excludedVariableName";
+        parameter.Value = excludedVariableName;
+        command.Parameters.Add(parameter);
+
+        var differences = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var variableName = reader.GetString(0);
+            if (!RuntimeDerivedMySqlVariables.Contains(variableName))
+            {
+                differences.Add(variableName);
+            }
+        }
+
+        if (differences.Count > 0)
+        {
+            var variableNames = string.Join(", ", differences.Order(StringComparer.OrdinalIgnoreCase));
+            throw new InvalidOperationException(
+                $"MySQL variables contain unpublished Main changes: {variableNames}. " +
+                "Synchronize Main and Runtime before releasing idle backend connections.");
+        }
+    }
+
+    private static async Task<long> GetIdleBackendConnectionCountAsync(
+        DbConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COALESCE(SUM(ConnFree), 0) FROM stats_mysql_connection_pool";
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
+    }
+
+    private static async Task ExecuteNonQueryAsync(
+        DbConnection connection,
+        string commandText,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = commandText;
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<HashSet<string>> GetTableColumnsAsync(

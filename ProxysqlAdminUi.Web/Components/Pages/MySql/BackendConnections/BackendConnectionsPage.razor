@@ -8,24 +8,26 @@
 @attribute [Authorize]
 
 @inject ProxySqlRepository ProxySqlRepository
+@inject DialogService DialogService
+@inject AppNotificationService NotificationService
 @inject LocalizationService L
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 
 <RadzenStack Gap="1rem">
     <RadzenRow AlignItems="AlignItems.Center">
-        <RadzenColumn Size="8">
+        <RadzenColumn Size="8" SizeSM="12">
             <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1">@L["Connection Overview"]</RadzenText>
             <RadzenText TextStyle="TextStyle.Body2">@L["Frontend to ProxySQL to backend connection topology"]</RadzenText>
         </RadzenColumn>
-        <RadzenColumn Size="4">
+        <RadzenColumn Size="4" SizeSM="12">
             <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
                 <RadzenButton Text='@L["View connection details"]' Icon="lan" ButtonStyle="ButtonStyle.Light"
                               Click='@(() => NavigationManager.NavigateTo(GetConnectionSessionsUrl()))' />
                 @if (HostgroupId.HasValue)
                 {
                     <RadzenButton Text='@($"{L["Hostgroup"]}: {HostgroupId}")' Icon="filter_alt" ButtonStyle="ButtonStyle.Light"
-                                  Click="ClearHostgroupFilterAsync" Disabled="@_loading" />
+                                  Click="ClearHostgroupFilterAsync" Disabled="@(_loading || _releasingIdleConnections)" />
                 }
             </RadzenStack>
         </RadzenColumn>
@@ -33,9 +35,14 @@
 
     <RadzenRow AlignItems="AlignItems.Center" class="refresh-controls">
         <RadzenColumn Size="12">
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenStack Orientation="Orientation.Horizontal" Wrap="FlexWrap.Wrap"
+                         AlignItems="AlignItems.Center" Gap="0.5rem">
                 <RadzenButton Text='@L["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Primary"
-                              Click="LoadAsync" Disabled="@_loading" />
+                              Click="LoadAsync" Disabled="@(_loading || _releasingIdleConnections)" />
+                <RadzenButton Text='@(_releasingIdleConnections ? L["Releasing idle connections..."] : L["Release idle backend connections"])'
+                              Icon='@(_releasingIdleConnections ? "hourglass_empty" : "cleaning_services")'
+                              ButtonStyle="ButtonStyle.Warning" Click="ReleaseIdleBackendConnectionsAsync"
+                              Disabled="@(_loading || _releasingIdleConnections || _snapshot is null)" />
                 <RadzenCheckBox TValue="bool" Value="@_autoRefresh" Name="AutoRefresh"
                                 Change="@((bool value) => OnAutoRefreshChangedAsync(value))" />
                 <RadzenLabel Text='@L["Auto refresh"]' Component="AutoRefresh" />
@@ -165,6 +172,7 @@
     private ConnectionTopologySnapshotViewModel? _snapshot;
     private string? _error;
     private bool _loading;
+    private bool _releasingIdleConnections;
     private bool _autoRefresh = true;
     private int _refreshIntervalSeconds = DefaultRefreshIntervalSeconds;
     private CancellationTokenSource? _refreshCancellation;
@@ -207,6 +215,53 @@
         HostgroupId = null;
         NavigationManager.NavigateTo("/mysql/backend-connections", replace: true);
         await LoadAsync();
+    }
+
+    private async Task ReleaseIdleBackendConnectionsAsync()
+    {
+        var message = $"{L["This operation releases all idle backend physical connections (ConnFree) across the ProxySQL instance. It does not terminate ConnUsed connections."]} " +
+                      $"{L["Currently displayed idle connections"]}: {GetBackendFree()}.";
+        if (HostgroupId.HasValue)
+        {
+            message += $" {L["The current Hostgroup filter does not limit this operation."]}";
+        }
+
+        var confirmed = await DialogService.Confirm(
+            message,
+            L["Confirm release idle connections"],
+            new ConfirmOptions
+            {
+                OkButtonText = L["Release"],
+                CancelButtonText = L["Cancel"],
+                Width = "560px"
+            });
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        _releasingIdleConnections = true;
+        try
+        {
+            var releasedCount = await ProxySqlRepository.ReleaseIdleBackendConnections();
+            await LoadAsync();
+            NotificationService.Notify(
+                NotificationSeverity.Success,
+                L["Idle backend connections released"],
+                string.Format(L["Released {0} idle backend connections."], releasedCount));
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(
+                NotificationSeverity.Error,
+                L["Failed to release idle backend connections"],
+                ex.Message);
+        }
+        finally
+        {
+            _releasingIdleConnections = false;
+        }
     }
 
     private async Task OnAutoRefreshChangedAsync(bool value)
@@ -268,7 +323,7 @@
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_refreshIntervalSeconds));
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                if (!_loading)
+                if (!_loading && !_releasingIdleConnections)
                 {
                     await InvokeAsync(LoadAsync);
                 }

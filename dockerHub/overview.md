@@ -2,7 +2,7 @@
 
 ProxySQL Admin UI 是一个基于 Blazor Server 和 .NET 8 的 ProxySQL Web 管理界面。应用主要通过 ProxySQL Admin 接口读取配置和运行统计；启用 Galera 仲裁权重功能后，会使用独立凭据直连 ProxySQL Runtime Galera 拓扑中的节点。
 
-当前版本：`v0.5`
+当前版本：`v0.6`
 
 ## 功能
 
@@ -14,6 +14,7 @@ ProxySQL Admin UI 是一个基于 Blazor Server 和 .NET 8 的 ProxySQL Web 管�
 - 独立查看 Galera Hostgroup 的 Writer、Backup Writer、Reader、Offline 定义和成员关系
 - 在 Galera Hostgroup 的 Runtime TAB 中读取和调整节点当前生效的 `pc.weight` 仲裁权重
 - 在“连接总览”中查看前端连接统计和后端连接池状态
+- 在“连接总览”中释放整个 ProxySQL 实例后端连接池中的空闲物理连接（`ConnFree`），不会中断正在使用的 `ConnUsed` 连接
 - 在“连接详情”中查看前端客户端、ProxySQL 会话、Hostgroup 与后端 MySQL 的当前绑定关系
 - 连接详情使用服务端分页，记录总数没有 200 条上限
 - 提供中文和英文界面
@@ -35,7 +36,7 @@ docker run -d --restart unless-stopped \
   -e APP_DB_PATH=/app/data \
   -e PAI_PROXYSQL='Server=host.docker.internal;Port=6032;Uid=radmin;Pwd=CHANGE_ME;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;' \
   -v proxysql-admin-ui-data:/app/data \
-  amwpfiqvy/proxysql-admin-ui:v0.5
+  amwpfiqvy/proxysql-admin-ui:v0.6
 ```
 
 启动后访问：`http://localhost:8001`
@@ -56,7 +57,7 @@ docker run -d --restart unless-stopped \
 ```yaml
 services:
   proxysql-admin-ui:
-    image: amwpfiqvy/proxysql-admin-ui:v0.5
+    image: amwpfiqvy/proxysql-admin-ui:v0.6
     container_name: proxysql-admin-ui
     restart: unless-stopped
     ports:
@@ -120,6 +121,7 @@ A-Z  a-z  0-9  _  %
 - 仲裁权重修改只影响当前 Galera 进程，不编辑节点配置文件，节点重启后可能丢失。
 - Galera 节点连接使用 TLS 优先模式；节点不支持 TLS 时允许回退到非 TLS，生产环境建议在数据库侧正确配置 TLS。
 - “连接总览”展示 ProxySQL 前端连接统计、后端物理连接总数、占用连接和空闲连接，以及各 Hostgroup 的连接池状态。
+- “连接总览”支持释放整个 ProxySQL 实例的后端空闲物理连接（`ConnFree`）；Hostgroup 筛选只影响页面显示，不限制释放范围，正在使用的 `ConnUsed` 连接不会被中断。
 - “连接详情”以 ProxySQL 前端会话为主行，展示客户端地址、Session ID、Thread ID、Hostgroup、后端地址、命令和 SQL。
 - multiplex 生效时，空闲前端会话可能暂时显示为“未绑定”；连接池中的 `ConnFree` 也不会强行映射到某个前端会话。
 - 连接详情采用 `COUNT(*)` 和 `LIMIT/OFFSET` 服务端分页，`10 / 20 / 50 / 100 / 200` 仅表示单页行数。
@@ -142,5 +144,5 @@ GET http://localhost:8001/health
 ## 相关链接
 
 - 源码：https://github.com/Apq/proxysql-admin-ui
-- 版本标签：https://github.com/Apq/proxysql-admin-ui/releases/tag/v0.5
+- 版本标签：https://github.com/Apq/proxysql-admin-ui/releases/tag/v0.6
 - 许可证：MIT
