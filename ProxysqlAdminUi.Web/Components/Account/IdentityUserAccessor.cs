@@ -13,6 +13,6 @@ internal sealed class IdentityUserAccessor(UserManager<ProxysqlAdminUiWebUser> u
             redirectManager.RedirectToWithStatus("Account/InvalidUser", $"Error: Unable to load user with ID '{userManager.GetUserId(context.User)}'.", context);
         }
 
-        return user;
+        return user ?? throw new InvalidOperationException("The current user could not be loaded after redirecting.");
     }
 }

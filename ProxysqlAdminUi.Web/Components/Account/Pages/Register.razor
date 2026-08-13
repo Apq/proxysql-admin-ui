@@ -102,6 +102,7 @@
             RedirectManager.RedirectTo(
                 "Account/RegisterConfirmation",
                 new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
+            return;
         }
 
         await SignInManager.SignInAsync(user, isPersistent: false);

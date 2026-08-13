@@ -4,6 +4,7 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
 		<UserSecretsId>aspnet-BlazorApp1-07983579-be1b-4ab0-ad40-8d9b0eb6a245</UserSecretsId>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 		<DockerfileContext>.</DockerfileContext>
