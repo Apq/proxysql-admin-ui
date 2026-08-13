@@ -1,15 +1,23 @@
 # ProxySQL Admin UI
 
-ProxySQL Admin UI 是一个基于 Blazor Server 和 .NET 10 的 ProxySQL Web 管理界面。应用主要通过 ProxySQL Admin 接口读取配置和运行统计；启用 Galera 仲裁权重功能后，会使用独立凭据直连 ProxySQL Runtime Galera 拓扑中的节点。
+ProxySQL Admin UI 是一个基于 ASP.NET Core .NET 10、Razor Components 和 Interactive Server 的 ProxySQL Web 管理界面。应用通过 ProxySQL Admin 接口管理配置并读取运行统计；启用 Galera 仲裁权重功能后，会使用独立凭据直连 ProxySQL Runtime Galera 拓扑中的节点。
 
-当前版本：`v0.6`
+当前版本：`v0.7`
+
+## v0.7 更新
+
+- 项目目标框架、ASP.NET Core Identity、Entity Framework Core、测试依赖和 Docker SDK/Runtime 基础镜像统一升级到 .NET 10
+- Identity 页面采用 .NET 10 的非异常式导航行为，修正登录、注册、密码管理、邮件确认和外部登录流程中的重定向控制流
+- Swagger/OpenAPI 依赖升级到 `Swashbuckle.AspNetCore 10.2.3`
+- Docker 镜像继续提供 `linux/amd64` 和 `linux/arm64` 两种架构，并发布 `v0.7`、带构建时间的完整版本号和 `latest` 标签
 
 ## 功能
 
-- 查看 ProxySQL 仪表盘、全局状态和查询摘要
-- 管理 `mysql_servers`、`mysql_users` 和 `mysql_query_rules`
+- 查看 ProxySQL 仪表盘、全局状态、内存统计和查询摘要
+- 管理 `mysql_servers`、`mysql_users`、`mysql_query_rules` 和全局变量
 - 修改服务器、用户和查询规则后执行对应的 `LOAD ... TO RUNTIME` 与 `SAVE ... TO DISK`
 - 分别查看 `main`、`runtime`、`disk` 三层配置；`runtime` 和 `disk` 为只读视图
+- 配置页支持 URL Hash 层级导航，可通过浏览器前进、后退和刷新保留当前 TAB
 - 独立查看 Replication Hostgroup 的 Writer/Reader 定义和成员关系
 - 独立查看 Galera Hostgroup 的 Writer、Backup Writer、Reader、Offline 定义和成员关系
 - 在 Galera Hostgroup 的 Runtime TAB 中读取和调整节点当前生效的 `pc.weight` 仲裁权重
@@ -17,11 +25,12 @@ ProxySQL Admin UI 是一个基于 Blazor Server 和 .NET 10 的 ProxySQL Web 管
 - 在“连接总览”中释放整个 ProxySQL 实例后端连接池中的空闲物理连接（`ConnFree`），不会中断正在使用的 `ConnUsed` 连接
 - 在“连接详情”中查看前端客户端、ProxySQL 会话、Hostgroup 与后端 MySQL 的当前绑定关系
 - 连接详情使用服务端分页，记录总数没有 200 条上限
+- 管理查询规则中的 `cache_ttl`，查看 ProxySQL 查询缓存全局统计，并可手动清空查询缓存
 - 提供中文和英文界面
 - 提供 `/health` 健康检查端点
 
 > [!CAUTION]
-> 本应用可以修改线上 ProxySQL 的路由和认证配置，也可以修改 Galera 节点进程当前生效的仲裁权重。生产环境请限制 Web 界面访问来源，使用专用管理账号，并在执行写操作前确认集群状态和回滚方案。
+> 本应用可以修改线上 ProxySQL 的路由、认证和全局变量配置，也可以修改 Galera 节点进程当前生效的仲裁权重。生产环境请限制 Web 界面访问来源，使用专用管理账号，并在执行写操作前确认 Main、Runtime、Disk 三层状态和回滚方案。
 
 ## 快速开始
 
@@ -36,7 +45,7 @@ docker run -d --restart unless-stopped \
   -e APP_DB_PATH=/app/data \
   -e PAI_PROXYSQL='Server=host.docker.internal;Port=6032;Uid=radmin;Pwd=CHANGE_ME;ConnectionReset=False;Pooling=True;ConnectionLifeTime=3000000;' \
   -v proxysql-admin-ui-data:/app/data \
-  amwpfiqvy/proxysql-admin-ui:v0.6
+  amwpfiqvy/proxysql-admin-ui:v0.7
 ```
 
 启动后访问：`http://localhost:8001`
@@ -57,7 +66,7 @@ docker run -d --restart unless-stopped \
 ```yaml
 services:
   proxysql-admin-ui:
-    image: amwpfiqvy/proxysql-admin-ui:v0.6
+    image: amwpfiqvy/proxysql-admin-ui:v0.7
     container_name: proxysql-admin-ui
     restart: unless-stopped
     ports:
@@ -81,7 +90,7 @@ volumes:
 
 ## 首次登录
 
-身份数据库中没有用户时，应用会创建配置的 Web 管理员，并生成一个 14 位随机初始密码。密码字符范围为：
+身份数据库中没有用户时，应用会创建固定用户名 `admin` 的 Web 管理员，并生成一个 14 位随机初始密码。密码字符范围为：
 
 ```text
 A-Z  a-z  0-9  _  %
@@ -89,7 +98,7 @@ A-Z  a-z  0-9  _  %
 
 登录页会显示初始用户名和密码。管理员成功修改密码后，初始凭据提示会自动删除。
 
-首次初始化的 Web 管理员用户名固定为 `admin`。应用不会从环境变量读取固定的 Web 初始密码。已有身份数据库不会在容器重启或升级时重置管理员密码。
+应用不会从环境变量读取 Web 管理员用户名或固定初始密码。已有身份数据库不会在容器重启或升级时重置管理员密码。
 
 ## 数据持久化
 
@@ -107,7 +116,7 @@ A-Z  a-z  0-9  _  %
 | `PAI_PROXYSQL` | 是 | ProxySQL Admin 连接字符串，通常使用 Admin 端口 `6032` |
 | `PAI_GALERA_USERNAME` | 否 | Galera 节点管理用户名；与 `PAI_GALERA_PASSWORD` 同时配置后启用仲裁权重功能 |
 | `PAI_GALERA_PASSWORD` | 否 | Galera 节点管理密码；与 `PAI_GALERA_USERNAME` 同时配置后启用仲裁权重功能 |
-| `APP_DB_PATH` | 建议 | 身份数据根目录；容器部署建议设为 `/app/data` 并挂载持久化卷 |
+| `APP_DB_PATH` | 建议 | 身份数据库和 `initial-login.json` 的根目录；容器部署建议设为 `/app/data` 并挂载持久化卷 |
 | `ASPNETCORE_URLS` | 否 | Web 监听地址，镜像默认使用 `8001` 端口 |
 
 环境变量中的双下划线 `__` 对应 .NET 配置中的层级分隔符。
@@ -121,10 +130,12 @@ A-Z  a-z  0-9  _  %
 - 仲裁权重修改只影响当前 Galera 进程，不编辑节点配置文件，节点重启后可能丢失。
 - Galera 节点连接使用 TLS 优先模式；节点不支持 TLS 时允许回退到非 TLS，生产环境建议在数据库侧正确配置 TLS。
 - “连接总览”展示 ProxySQL 前端连接统计、后端物理连接总数、占用连接和空闲连接，以及各 Hostgroup 的连接池状态。
-- “连接总览”支持释放整个 ProxySQL 实例的后端空闲物理连接（`ConnFree`）；Hostgroup 筛选只影响页面显示，不限制释放范围，正在使用的 `ConnUsed` 连接不会被中断。
+- “连接总览”支持释放整个 ProxySQL 实例的后端空闲物理连接（`ConnFree`）；Hostgroup 筛选只影响页面显示，不限制释放范围，正在使用的 `ConnUsed` 连接不会被中断。操作只临时调整 Runtime 的 `mysql-free_connections_pct`，不会保存到 Disk，并会恢复操作前的 Main 与 Runtime 值。
+- 释放空闲连接需要执行 `LOAD MYSQL VARIABLES TO RUNTIME`。如果检测到其他尚未发布的 Main MySQL 变量变更，应用会拒绝操作，避免把无关配置一并加载到 Runtime。
 - “连接详情”以 ProxySQL 前端会话为主行，展示客户端地址、Session ID、Thread ID、Hostgroup、后端地址、命令和 SQL。
 - multiplex 生效时，空闲前端会话可能暂时显示为“未绑定”；连接池中的 `ConnFree` 也不会强行映射到某个前端会话。
 - 连接详情采用 `COUNT(*)` 和 `LIMIT/OFFSET` 服务端分页，`10 / 20 / 50 / 100 / 200` 仅表示单页行数。
+- ProxySQL 查询缓存不会因设置 `mysql-query_cache_size_MB` 而自动缓存所有查询。只有命中 Runtime 查询规则且规则设置 `cache_ttl > 0` 的查询才会进入缓存；没有缓存规则时，缓存条目、命中次数和内存占用均为 `0`。
 
 ## 支持架构
 
@@ -139,10 +150,10 @@ A-Z  a-z  0-9  _  %
 GET http://localhost:8001/health
 ```
 
-返回 HTTP `200` 表示 Web 应用健康检查通过。
+返回 HTTP `200` 表示 Web 应用进程可以响应请求。该端点不检查 ProxySQL Admin 或 Galera 节点的连通性。
 
 ## 相关链接
 
 - 源码：https://github.com/Apq/proxysql-admin-ui
-- 版本标签：https://github.com/Apq/proxysql-admin-ui/releases/tag/v0.6
+- 版本标签：https://github.com/Apq/proxysql-admin-ui/releases/tag/v0.7
 - 许可证：MIT
