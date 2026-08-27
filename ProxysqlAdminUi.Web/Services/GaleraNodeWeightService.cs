@@ -66,12 +66,6 @@ public sealed class GaleraNodeWeightService(
             var before = await InspectNodeAsync(request.Hostname, request.Port, cancellationToken);
             ValidateExpectedState(request, before);
 
-            if (!before.IsHealthyForChange)
-            {
-                throw new InvalidOperationException(
-                    "The Galera node must be Primary, Synced, Ready and Connected before its quorum weight can be changed.");
-            }
-
             if (before.HasWritePrivilege is false)
             {
                 throw new InvalidOperationException(
@@ -112,12 +106,6 @@ public sealed class GaleraNodeWeightService(
             if (!string.Equals(before.ClusterStateUuid, after.ClusterStateUuid, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException("The Galera cluster UUID changed while the quorum weight was being updated.");
-            }
-
-            if (!after.IsHealthyForChange)
-            {
-                throw new InvalidOperationException(
-                    "The weight changed, but the node no longer reports Primary, Synced, Ready and Connected state.");
             }
 
             logger.LogInformation(

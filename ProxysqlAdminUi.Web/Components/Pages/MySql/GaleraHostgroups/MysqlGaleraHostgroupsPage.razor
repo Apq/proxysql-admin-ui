@@ -179,7 +179,7 @@
                                                             }
                                                             else if (nodeState.Node is not null)
                                                             {
-                                                                <RadzenBadge BadgeStyle="@(nodeState.Node.IsHealthyForChange ? BadgeStyle.Success : BadgeStyle.Warning)"
+                                                                <RadzenBadge BadgeStyle="@(nodeState.Node.IsHealthy ? BadgeStyle.Success : BadgeStyle.Warning)"
                                                                              Text="@nodeState.Node.Weight.ToString()" />
                                                             }
                                                             else

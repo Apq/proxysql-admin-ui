@@ -59,12 +59,6 @@ else if (_node is not null)
                          Text="@(_node.HasWritePrivilege is true ? L["Write privilege detected"] : L["Write privilege will be checked on change"])" />
         </RadzenStack>
 
-        @if (!_node.IsHealthyForChange)
-        {
-            <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" Variant="Variant.Flat">
-                @L["The node must be Primary, Synced, Ready and Connected before its quorum weight can be changed."]
-            </RadzenAlert>
-        }
         <RadzenFormField Text='@L["New quorum weight"]' Variant="Variant.Outlined">
             <RadzenNumeric @bind-Value="_requestedWeight" Min="0" Max="255" Step="1"
                            Disabled="@(!CanEdit)" Style="width: 100%" />
@@ -93,7 +87,7 @@ else if (_node is not null)
     private bool _isLoading = true;
     private bool _isSaving;
 
-    private bool CanEdit => _node is { IsHealthyForChange: true };
+    private bool CanEdit => _node is not null;
     private bool CanSubmit =>
         CanEdit &&
         !_isSaving &&

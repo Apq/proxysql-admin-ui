@@ -126,7 +126,7 @@ A-Z  a-z  0-9  _  %
 - Galera Hostgroup 的 Main TAB 管理 ProxySQL Main 配置；Runtime TAB 展示 ProxySQL 当前运行拓扑，并额外读取 Galera 节点进程当前生效的 `pc.weight`。
 - “ProxySQL 路由权重”对应 `mysql_servers.weight`；“Galera 仲裁权重”对应节点 `wsrep_provider_options` 中的 `pc.weight`，两者不会互相替代。
 - Galera 仲裁权重仅在 Runtime TAB 读取和修改。相同 `hostname:port` 出现在多个 Hostgroup 时，一次页面刷新只读取一次并共享显示结果。
-- 修改仲裁权重前会重新校验 Runtime 成员、节点身份、集群 UUID、旧权重以及 `Primary / Synced / Ready / Connected` 状态；修改后再次读取并验证结果。
+- 修改仲裁权重前会重新校验 Runtime 成员、节点身份、集群 UUID 和旧权重；修改后再次读取并验证新权重和集群 UUID。节点的 `Primary / Synced / Ready / Connected` 状态仅用于展示，不作为修改条件。
 - 仲裁权重修改只影响当前 Galera 进程，不编辑节点配置文件，节点重启后可能丢失。
 - Galera 节点连接使用 TLS 优先模式；节点不支持 TLS 时允许回退到非 TLS，生产环境建议在数据库侧正确配置 TLS。
 - “连接总览”展示 ProxySQL 前端连接统计、后端物理连接总数、占用连接和空闲连接，以及各 Hostgroup 的连接池状态。

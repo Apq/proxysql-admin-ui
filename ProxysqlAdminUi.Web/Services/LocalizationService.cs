@@ -248,7 +248,6 @@ public sealed class LocalizationService
         ["Write privilege not detected"] = "未检测到写权限",
         ["Write privilege will be checked on change"] = "提交变更时检查写权限",
         ["Changing Galera quorum weight can change which network partition remains Primary. This is not the ProxySQL routing weight."] = "调整 Galera 仲裁权重可能改变网络分区后保留为 Primary 的组件。这不是 ProxySQL 路由权重。",
-        ["The node must be Primary, Synced, Ready and Connected before its quorum weight can be changed."] = "节点必须处于 Primary、Synced、Ready 且 Connected 状态才能调整仲裁权重。",
         ["The configured Galera node account does not have permission to change wsrep_provider_options."] = "配置的 Galera 节点账号没有修改 wsrep_provider_options 的权限。",
         ["The selected server is no longer a member of the Runtime Galera hostgroup topology."] = "所选服务器已不在 Runtime Galera Hostgroup 拓扑中。",
         ["This change affects only the running Galera process and may be lost after the node restarts."] = "此变更仅对当前运行中的 Galera 进程生效，节点重启后可能丢失。",

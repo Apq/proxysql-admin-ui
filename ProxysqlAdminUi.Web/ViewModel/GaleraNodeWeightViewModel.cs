@@ -18,7 +18,7 @@ public sealed class GaleraNodeWeightViewModel
     public bool IsDefaultWeight { get; init; }
     public bool? HasWritePrivilege { get; init; }
 
-    public bool IsHealthyForChange =>
+    public bool IsHealthy =>
         WsrepOn &&
         Ready &&
         Connected &&
