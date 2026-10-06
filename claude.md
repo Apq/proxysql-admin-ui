@@ -1,487 +1,136 @@
-# ProxySQL Admin UI - AI Assistant Context
+# ProxySQL Admin UI - AI 助手上下文
 
-## Project Overview
+## 项目概览
 
-**ProxySQL Admin UI** is a modern web-based administration dashboard for managing ProxySQL (a high-performance MySQL proxy server). Built with .NET 10 and Blazor Server, it provides a user-friendly interface for monitoring performance, configuring backend servers, managing user credentials, and defining query routing rules.
+**ProxySQL Admin UI**：管理 ProxySQL（高性能 MySQL 代理）的现代 Web 管理面板。.NET 10 + Blazor Server，提供监控性能、配置后端服务器、管理用户凭据、定义查询路由规则的界面。
 
-**License:** MIT
-**Primary Language:** C# (.NET 10)
-**Web Framework:** Blazor Server with Radzen UI Components
+- **许可**：MIT
+- **语言**：C#（.NET 10）
+- **UI**：Blazor Server + Radzen 组件
+- **主项目**：`ProxysqlAdminUi.Web/ProxysqlAdminUi.Web.csproj`
+- **入口**：`Program.cs`，ASP.NET Core 端口 8000（可配）
+- **部署**：Docker（Alpine）
+- **数据库**：ProxySQL（MySQL 协议 6033）+ SQLite（本地认证）
 
-## Quick Facts
+## 技术栈
 
-- **Main Project:** `ProxysqlAdminUi.Web/ProxysqlAdminUi.Web.csproj`
-- **Startup File:** `ProxysqlAdminUi.Web/Program.cs`
-- **Entry Point:** ASP.NET Core web server on port 8000 (configurable)
-- **Deployment:** Docker containers (Alpine Linux based)
-- **Databases:**
-  - ProxySQL (MySQL protocol on port 6033)
-  - SQLite (local identity/authentication)
+- .NET 10（Alpine 运行时）、ASP.NET Core、Blazor Server（SignalR 实时 UI）
+- EF Core 8.0.10；Radzen Blazor（Material Design）+ Material 图标
+- 数据访问：`MySql.EntityFrameworkCore`（ProxySQL）、`Microsoft.EntityFrameworkCore.Sqlite`（认证库）、复杂 ProxySQL 操作用直接 SQL
+- 辅助：Newtonsoft.Json 13.0.3、Swashbuckle 6.9.0（OpenAPI）、ASP.NET Core Identity（Cookie 认证）
+- 测试：xUnit 2.9.0、Aspire.Hosting.Testing（集成）、coverlet
 
-## Technology Stack
+## 架构（分层）
 
-### Core Framework
-- **.NET 10** - LTS version with Alpine Linux runtime
-- **ASP.NET Core** - Web framework
-- **Blazor Server** - Interactive server-side rendering
-- **Entity Framework Core 8.0.10** - ORM for data access
+UI 层（`Pages/*.razor`、`Layout/MainLayout.razor`、`CustomComponents/`）→ 服务层（`DefaultUserSeedService.cs`、组件内业务逻辑）→ 仓储层（`Repositories/ProxySqlRepository.cs`）→ 数据层（`Contexts/ProxySqlContext.cs`、`ProxysqlAdminUiWebAuthContext.cs`）→ 数据库（ProxySQL + SQLite）。
 
-### UI & Frontend
-- **Radzen Blazor Components** - Material Design component library
-- **Material Design Icons** - Icon set
-- **Interactive Server Rendering** - Real-time UI updates via SignalR
+关键模式：仓储模式抽象数据访问；不同数据源分 DbContext；DI 在 `Program.cs`；Blazor 组件 code-behind（`@code`）。
 
-### Data Access
-- **MySql.EntityFrameworkCore** - ProxySQL connection via MySQL protocol
-- **Microsoft.EntityFrameworkCore.Sqlite** - Local authentication database
-- **Direct SQL Execution** - For complex ProxySQL-specific operations
-
-### Supporting Libraries
-- **Newtonsoft.Json 13.0.3** - JSON serialization
-- **Swashbuckle.AspNetCore 6.9.0** - OpenAPI/Swagger documentation
-- **ASP.NET Core Identity** - Cookie-based authentication
-
-### Testing
-- **xUnit 2.9.0** - Unit testing framework
-- **Aspire.Hosting.Testing** - Integration testing
-- **coverlet.collector** - Code coverage
-
-## Architecture
-
-### Layered Architecture
-
-```
-┌─────────────────────────────────────┐
-│  UI Layer (Blazor Components)       │
-│  - Pages/*.razor                    │
-│  - Layout/MainLayout.razor          │
-│  - CustomComponents/                │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│  Service Layer                      │
-│  - DefaultUserSeedService.cs        │
-│  - Business logic in components     │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│  Repository Layer                   │
-│  - ProxySqlRepository.cs            │
-│  - Data access methods              │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│  Data Layer (EF Core)               │
-│  - ProxySqlContext.cs               │
-│  - ProxysqlAdminUiWebAuthContext.cs │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│  Databases                          │
-│  - ProxySQL (MySQL)                 │
-│  - SQLite (Identity)                │
-└─────────────────────────────────────┘
-```
-
-### Key Patterns
-- **Repository Pattern** - `ProxySqlRepository.cs` abstracts data access
-- **DbContext Pattern** - Separate contexts for different data sources
-- **Dependency Injection** - Configured in `Program.cs`
-- **Component-Based UI** - Blazor Server components with code-behind
-
-## Directory Structure
+## 目录速览
 
 ```
 ProxysqlAdminUi.Web/
 ├── Components/
-│   ├── Account/              # Authentication UI (Login, Register, etc.)
-│   ├── Pages/                # Main application pages
-│   │   ├── Home.razor        # Dashboard with metrics
-│   │   ├── MySql/            # MySQL management pages
-│   │   │   ├── Servers/      # Backend server management
-│   │   │   ├── Users/        # User credentials
-│   │   │   ├── Rules/        # Query rules
-│   │   │   └── Queries/      # Query statistics
-│   │   └── ProxySQL/         # ProxySQL configuration pages
-│   ├── CustomComponents/     # Reusable components (e.g., TimeInput)
-│   └── Layout/               # Layout components (MainLayout, NavMenu)
-├── Contexts/
-│   ├── ProxySqlContext.cs               # EF Core context for ProxySQL
-│   └── ProxysqlAdminUiWebAuthContext.cs # EF Core context for Identity
-├── Data/                     # Identity and data utilities
-├── Models/                   # Entity models (mapped to database tables)
-├── Repositories/
-│   └── ProxySqlRepository.cs # Data access layer
-├── Services/
-│   └── DefaultUserSeedService.cs # User initialization
-├── Extensions/
-│   └── FormatHelper.cs       # Utility methods for formatting
-├── ViewModel/                # View models for UI
-├── Migrations/               # EF Core migrations
-├── wwwroot/                  # Static files
-├── Program.cs                # Application startup
-├── App.razor                 # Root component
-├── Routes.razor              # Routing configuration
-├── _Imports.razor            # Global using directives
-└── appsettings.json          # Configuration
+│   ├── Account/              # 认证 UI（登录/注册）
+│   ├── Pages/                # 页面：Home.razor（指标面板）、MySql/（Servers、Users、Rules、Queries）、ProxySQL/
+│   ├── CustomComponents/     # 复用组件（如 TimeInput）
+│   └── Layout/               # MainLayout、NavMenu
+├── Contexts/                 # 两个 EF Core DbContext
+├── Data/                     # Identity 与数据工具
+├── Models/                   # 实体模型（映射数据库表）
+├── Repositories/ProxySqlRepository.cs
+├── Services/DefaultUserSeedService.cs
+├── Extensions/FormatHelper.cs
+├── ViewModel/  Migrations/  wwwroot/
+├── Program.cs  App.razor  Routes.razor  _Imports.razor  appsettings.json
 ```
 
-## Key Files
+## 关键文件
 
-### Application Startup & Configuration
-- **`Program.cs`** (108 lines) - Core application setup:
-  - Registers services (Blazor, Radzen, Identity, DbContexts, Repository)
-  - Configures authentication (cookie-based)
-  - Database initialization and migrations
-  - Swagger/OpenAPI setup
+- **`Program.cs`**：服务注册（Blazor/Radzen/Identity/DbContexts/Repository）、Cookie 认证、库初始化迁移、Swagger。
+- **`appsettings.json`**：ProxySQL 连接串、默认管理员凭据、Kestrel、日志。
+- **`Contexts/ProxySqlContext.cs`**：映射 ProxySQL 表（mysql_servers、mysql_users、mysql_query_rules、stats_*）。
+- **`Repositories/ProxySqlRepository.cs`**：服务器/用户/规则 CRUD、统计查询、复杂查询直跑 SQL；方法如 `GetServers()`、`GetUsers()`、`GetQueryRules()`、`GetQueryDigest()`。
+- **模型**：`MysqlServerModel`、`MysqlUserModel`、`MysqlQueryRuleModel`（38 属性）、`GlobalVariableModel`、统计类（`StatsMySqlGlobalModel`、`StatsMysqlQueryDigestModel`、`StatsMemoryMetricsModel`）。
+- **`Components/Pages/Home.razor`**（252 行）：8 张指标卡（缓存效率/内存/健康/服务器/连接/流量/在线时长），Radzen 仪表盘。
+- **`Layout/MainLayout.razor`**：顶栏 6 大区（Home、Users、Servers、Rules、Queries、Variables）+ 版本徽章页脚。
+- **`Extensions/FormatHelper.cs`**：`FormatBytes()`、`FormatUptime()`、`FormatLargeNumber()`、`FormatMicroseconds()`。
 
-- **`appsettings.json`** - Configuration:
-  - ProxySQL connection string
-  - Default admin credentials
-  - Kestrel HTTP server settings
-  - Logging configuration
+## 数据库
 
-### Data Access
-- **`Contexts/ProxySqlContext.cs`** - ProxySQL database context:
-  - Maps to ProxySQL tables (mysql_servers, mysql_users, mysql_query_rules, stats_*)
-  - Configured for MySQL connection
+**ProxySQL**（MySQL 协议）：连接在 `appsettings.json`（host localhost / Docker 内 `proxysql`，端口 6033，radmin/radmin）。表：`mysql_servers`、`mysql_users`、`mysql_query_rules`、`stats_mysql_query_digest`、`stats_mysql_global`、`stats_memory_metrics`、`global_variables`。
 
-- **`Repositories/ProxySqlRepository.cs`** - Data access layer:
-  - CRUD operations for servers, users, query rules
-  - Statistics retrieval methods
-  - Direct SQL execution for complex queries
-  - Methods: `GetServers()`, `GetUsers()`, `GetQueryRules()`, `GetQueryDigest()`, etc.
+**Identity（SQLite）**：`/app/db/app.db`（Docker）或 `./db/app.db`（本地）；ASP.NET Core Identity 表；迁移在 `Migrations/AuthMigrations/`。
 
-### Models (Entity Classes)
-- **`MysqlServerModel.cs`** - Backend MySQL server configuration
-- **`MysqlUserModel.cs`** - User credentials
-- **`MysqlQueryRuleModel.cs`** - Query routing/caching rules (38 properties)
-- **`GlobalVariableModel.cs`** - ProxySQL configuration variables
-- **Statistics Models:**
-  - `StatsMySqlGlobalModel.cs` - Global statistics
-  - `StatsMysqlQueryDigestModel.cs` - Query statistics
-  - `StatsMemoryMetricsModel.cs` - Memory usage
+## 开发流程
 
-### UI Components
-- **`Components/Pages/Home.razor`** (252 lines) - Main dashboard:
-  - 8 metric cards: cache efficiency, memory, health, servers, connections, traffic, uptime
-  - Uses Radzen gauges, cards, and charts
-
-- **`Components/Layout/MainLayout.razor`** - Application layout:
-  - Top navigation menu
-  - 6 main sections: Home, Users, Servers, Rules, Queries, Variables
-  - Footer with version badge
-
-### Utilities
-- **`Extensions/FormatHelper.cs`** - Formatting utilities:
-  - `FormatBytes()` - Human-readable byte sizes (KB, MB, GB)
-  - `FormatUptime()` - Converts seconds to days/hours/minutes
-  - `FormatLargeNumber()` - Number abbreviation (K, M, B)
-  - `FormatMicroseconds()` - Precision time formatting
-
-## Database Information
-
-### ProxySQL Database (MySQL Protocol)
-**Connection:** Configured in `appsettings.json`
-- **Host:** localhost (or `proxysql` in Docker)
-- **Port:** 6033 (ProxySQL MySQL interface)
-- **User:** radmin
-- **Password:** radmin
-
-**Tables:**
-- `mysql_servers` - Backend server configuration
-- `mysql_users` - User credentials
-- `mysql_query_rules` - Query routing rules
-- `stats_mysql_query_digest` - Query statistics
-- `stats_mysql_global` - Global metrics
-- `stats_memory_metrics` - Memory usage
-- `global_variables` - Configuration variables
-
-### Identity Database (SQLite)
-**Location:** `/app/db/app.db` (Docker) or `./db/app.db` (local)
-- **Provider:** SQLite via Entity Framework Core
-- **Purpose:** ASP.NET Core Identity (user authentication)
-- **Tables:** AspNetUsers, AspNetRoles, AspNetUserRoles, etc.
-- **Migrations:** Located in `Migrations/AuthMigrations/`
-
-## Development Workflow
-
-### Local Development
 ```bash
-# Run with hot reload
+# 本地热重载（http://localhost:5203）
 dotnet watch --project ProxysqlAdminUi.Web/ProxysqlAdminUi.Web.csproj
-
-# Build
 dotnet build
-
-# Run tests
 dotnet test
 
-# Access at: http://localhost:5203
-```
-
-### Docker Development Environment
-```bash
-# Start all services (app, ProxySQL, MariaDB)
-cd docker/
-docker-compose up -d
-
-# Access:
-# - App: http://localhost:8000
-# - ProxySQL Admin: http://localhost:6080
-# - MariaDB: localhost:3306
-```
-
-### Adding New Pages
-1. Create `.razor` file in `Components/Pages/` or appropriate subdirectory
-2. Add `@page "/route"` directive at the top
-3. Add `@attribute [Authorize]` for protected pages
-4. Add navigation link in `MainLayout.razor`
-5. Use Radzen components for UI consistency
-
-### Database Changes
-1. Modify entity model in `Models/`
-2. Update `ProxySqlContext.cs` if needed
-3. Add/update repository methods in `ProxySqlRepository.cs`
-4. For Identity changes, run migration:
-   ```bash
-   dotnet ef migrations add MigrationName --context ProxysqlAdminUiWebAuthContext
-   ```
-
-## Common Tasks
-
-### Adding a New ProxySQL Feature
-1. **Create Model** - Add entity class in `Models/`
-2. **Update Context** - Add `DbSet<T>` to `ProxySqlContext.cs`
-3. **Add Repository Methods** - Implement CRUD in `ProxySqlRepository.cs`
-4. **Create Page Component** - Add `.razor` file in `Components/Pages/`
-5. **Update Navigation** - Add menu item in `MainLayout.razor`
-
-### Adding Statistics/Metrics
-1. Create model class in `Models/` (e.g., `StatsMyNewMetricModel.cs`)
-2. Add query method in `ProxySqlRepository.cs`
-3. Update dashboard (`Home.razor`) or create dedicated page
-4. Use Radzen charts/gauges for visualization
-
-### Modifying Authentication
-- **User Model:** `Data/ProxysqlAdminUiWebUser.cs`
-- **DbContext:** `Contexts/ProxysqlAdminUiWebAuthContext.cs`
-- **Account Pages:** `Components/Account/` (Login, Register, etc.)
-- **Configuration:** `Program.cs` - Identity services registration
-
-## Build & Deployment
-
-### Docker Build
-**Dockerfile:** `docker/Dockerfile` (multi-stage build)
-- **Stage 1:** Build with .NET SDK 8.0 Alpine
-- **Stage 2:** Runtime with ASP.NET Core 8.0 Alpine
-- **Output:** Optimized Alpine-based image (~350MB)
-
-```bash
-docker build -f docker/Dockerfile \
-  --build-arg BUILD_VERSION=2025.11.04 \
-  --build-arg BUILD_SUFFIX=12345 \
-  -t dotfinity/proxysql-admin-ui:latest .
-```
-
-### CI/CD Pipelines (GitHub Actions)
-
-**Development Branch (`dev`):**
-- Workflow: `.github/workflows/docker-container-builder.yml`
-- Registry: Private (proget.dotfinity.eu)
-- Tags: `{DATE}-{RUN_ID}`, `latest`
-
-**Main Branch (`main`):**
-- Workflow: `.github/workflows/docker-container-publish.yml`
-- Registry: Docker Hub (dotfinity/proxysql-admin-ui)
-- Tags: `{DATE}-{RUN_ID}`, `latest`
-- Creates git tag and pushes to repository
-
-## Environment Configuration
-
-### Environment Variables
-- `ASPNETCORE_ENVIRONMENT` - Development/Staging/Production
-- `ASPNETCORE_URLS` - Server binding (default: http://+:8000)
-- `PAI_PROXYSQL` - ProxySQL connection string
-- `APP_DB_PATH` - SQLite database location (default: /app/db/)
-- `BUILD_VERSION` - Version number (YYYY.MM.DD format)
-- `BUILD_SUFFIX` - Build identifier (GitHub run ID)
-
-### Configuration Files
-- `appsettings.json` - Base configuration
-- `appsettings.Development.json` - Development overrides
-- `docker/proxysql.cnf` - ProxySQL server configuration
-- `docker/docker-compose.yaml` - Local development stack
-
-## Testing
-
-### Test Project
-**Location:** `ProxysqlAdminUi.Tests/`
-- **Framework:** xUnit
-- **Type:** Integration tests using Aspire.Hosting.Testing
-- **Run Tests:** `dotnet test`
-
-### Current Tests
-- `WebTests.cs` - Verifies application starts and returns HTTP 200
-
-### Adding Tests
-```csharp
-[Fact]
-public async Task TestName()
-{
-    // Arrange
-    var appHost = await DistributedApplicationTestingBuilder
-        .CreateAsync<Projects.ProxysqlAdminUi_Web>();
-
-    // Act
-    var resource = appHost.Resources.Single(r => r.Name == "webfrontend");
-
-    // Assert
-    // ...
-}
-```
-
-## Important Conventions
-
-### Naming Conventions
-- **Models:** `{Entity}Model.cs` (e.g., `MysqlServerModel.cs`)
-- **Pages:** `{Feature}Page.razor` or `{Entity}.razor`
-- **ViewModels:** `{Feature}ViewModel.cs`
-- **Services:** `{Purpose}Service.cs`
-
-### Code Style
-- C# file-scoped namespaces
-- Dependency injection via constructor
-- Async/await for database operations
-- Razor component code-behind using `@code` blocks
-
-### Database Operations
-- Use `ProxySqlRepository` methods (don't bypass the repository)
-- Always use async methods (`async Task<T>`)
-- Dispose DbContext properly (handled by DI)
-- ProxySQL tables may require `LOAD ... TO RUNTIME` and `SAVE ... TO DISK`
-
-## ProxySQL-Specific Notes
-
-### Administrative Actions
-After modifying ProxySQL configuration (servers, users, rules), execute:
-1. `LOAD {TABLE} TO RUNTIME` - Apply changes
-2. `SAVE {TABLE} TO DISK` - Persist changes
-
-Example tables: `MYSQL SERVERS`, `MYSQL USERS`, `MYSQL QUERY RULES`, `MYSQL VARIABLES`
-
-### Query Rules
-- **Rule Matching:** Evaluated in order by `rule_id`
-- **Digest:** MD5 hash of normalized query
-- **Flagout:** Matching rule with flagOUT stops further evaluation
-- **Cache TTL:** Set via `cache_ttl` column (milliseconds)
-
-### Connection Flow
-```
-Client → ProxySQL (port 6033) → Backend MySQL Servers
-         ↓
-    Query Rules (routing/caching)
-         ↓
-    Hostgroups → Servers
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue:** Cannot connect to ProxySQL
-- Check connection string in `appsettings.json`
-- Verify ProxySQL is running on port 6033
-- Ensure credentials (radmin/radmin) are correct
-
-**Issue:** SQLite database locked
-- Check APP_DB_PATH permissions
-- Ensure directory `/app/db/` exists and is writable
-- In Docker, verify volume mount
-
-**Issue:** Changes not reflected in ProxySQL
-- Execute `LOAD ... TO RUNTIME` after configuration changes
-- Use Actions page or direct SQL execution
-
-**Issue:** Authentication not working
-- Check SQLite database exists and migrations applied
-- Verify default user creation in `Program.cs`
-- Review `DefaultUserSeedService.cs` logs
-
-## Dependencies
-
-### Critical NuGet Packages
-- `Microsoft.AspNetCore.Components.Web` - Blazor components
-- `Radzen.Blazor` - UI component library
-- `MySql.EntityFrameworkCore` - MySQL data provider
-- `Microsoft.EntityFrameworkCore.Sqlite` - SQLite data provider
-- `Microsoft.AspNetCore.Identity.EntityFrameworkCore` - Identity system
-
-### Dependabot Configuration
-- **File:** `.github/dependabot.yml`
-- **Schedule:** Weekly updates
-- **Target:** NuGet packages in ProxysqlAdminUi.Web
-
-## Resources
-
-### Official Documentation
-- ProxySQL: https://proxysql.com/documentation/
-- .NET 10: https://learn.microsoft.com/en-us/dotnet/
-- Blazor: https://learn.microsoft.com/en-us/aspnet/core/blazor
-- Radzen: https://blazor.radzen.com/
-
-### Repository Structure
-- Main branch: Production releases (Docker Hub)
-- Dev branch: Development builds (private registry)
-- Feature branches: Use standard GitHub flow
-
-## Version Information
-
-**Current Stack:**
-- .NET 10.0 (LTS)
-- Entity Framework Core 8.0.10
-- Radzen Blazor (latest)
-- ProxySQL 2.7.1 (via Docker)
-- MariaDB 11 (via Docker)
-
-**Versioning Scheme:**
-- Format: `YYYY.MM.DD-{RUN_ID}`
-- Example: `2025.11.04-123456`
-- Display: Footer badge with GitHub release link
-
-## Quick Reference
-
-### Important Commands
-```bash
-# Development
-dotnet watch --project ProxysqlAdminUi.Web/ProxysqlAdminUi.Web.csproj
-
-# Build
-dotnet build
-
-# Test
-dotnet test
-
-# Docker Compose
+# Docker 全栈（app:8000 / ProxySQL 管理:6080 / MariaDB:3306）
 cd docker && docker-compose up -d
 
-# Docker Build
+# Docker 构建
 docker build -f docker/Dockerfile -t proxysql-admin-ui .
 
-# Migrations (Identity)
+# Identity 迁移
 dotnet ef migrations add MigrationName --context ProxysqlAdminUiWebAuthContext --project ProxysqlAdminUi.Web
 ```
 
-### Key URLs (Local Development)
-- Application: http://localhost:5203 (dotnet watch) or http://localhost:8000 (Docker)
-- ProxySQL Web UI: http://localhost:6080
-- ProxySQL MySQL: localhost:6033
-- MariaDB: localhost:3306
-- Swagger: http://localhost:8000/swagger (if enabled)
+- **新页面**：`Components/Pages/` 建 `.razor` → 顶部 `@page "/route"` → 受保护页加 `@attribute [Authorize]` → `MainLayout.razor` 加导航 → 用 Radzen 组件保持一致。
+- **数据库变更**：改 `Models/` 实体 → 必要时更新 `ProxySqlContext.cs` → 更新仓储方法。
+- **新 ProxySQL 功能五步**：建模型 → Context 加 `DbSet<T>` → 仓储实现 CRUD → 建页面组件 → 加菜单项。
+- **加统计指标**：建 `Stats*Model.cs` → 仓储加查询方法 → 更新 `Home.razor` 或建专页 → Radzen 图表可视化。
+- **改认证**：`Data/ProxysqlAdminUiWebUser.cs`、`Contexts/ProxysqlAdminUiWebAuthContext.cs`、`Components/Account/`、`Program.cs` 的 Identity 注册。
+
+## 构建与部署
+
+- **Dockerfile**：`docker/Dockerfile` 多阶段（SDK 构建→Alpine 运行时，约 350MB），`--build-arg BUILD_VERSION/BUILD_SUFFIX`。
+- **CI/CD**：`dev` 分支 → `docker-container-builder.yml` → 私有库 proget.dotfinity.eu；`main` 分支 → `docker-container-publish.yml` → Docker Hub（dotfinity/proxysql-admin-ui），并打 git tag。标签格式 `{DATE}-{RUN_ID}`、`latest`。
+- **分支模型**：main=生产发布，dev=开发构建，功能分支走标准 GitHub flow。
+
+## 环境配置
+
+- `ASPNETCORE_ENVIRONMENT`、`ASPNETCORE_URLS`（默认 http://+:8000）
+- `PAI_PROXYSQL`（连接串）、`APP_DB_PATH`（SQLite 位置，默认 /app/db/）
+- `BUILD_VERSION`（YYYY.MM.DD）、`BUILD_SUFFIX`（GitHub run ID）；页脚徽章链到 GitHub release
+- 配置文件：`appsettings.json`、`appsettings.Development.json`、`docker/proxysql.cnf`、`docker/docker-compose.yaml`
+
+## 测试
+
+- 项目：`ProxysqlAdminUi.Tests/`，xUnit + Aspire.Hosting.Testing 集成测试，`dotnet test`。
+- 现有：`WebTests.cs` 验证应用启动返回 200。
+- 新测试用 `DistributedApplicationTestingBuilder.CreateAsync<Projects.ProxysqlAdminUi_Web>()` 模式。
+
+## 约定
+
+- **命名**：模型 `{Entity}Model.cs`、页面 `{Feature}Page.razor`/`{Entity}.razor`、VM `{Feature}ViewModel.cs`、服务 `{Purpose}Service.cs`。
+- **代码风格**：C# 文件作用域命名空间、构造器注入、数据库操作 async/await、`@code` 块。
+- **数据库操作**：走 `ProxySqlRepository` 方法（不绕过仓储）、全 async、DbContext 交 DI 释放；ProxySQL 表改后需 `LOAD ... TO RUNTIME` / `SAVE ... TO DISK`。
+
+## ProxySQL 专有要点
+
+- **管理动作**：改配置（服务器/用户/规则）后执行 `LOAD {TABLE} TO RUNTIME` 应用、`SAVE {TABLE} TO DISK` 持久化。表如 `MYSQL SERVERS`、`MYSQL USERS`、`MYSQL QUERY RULES`、`MYSQL VARIABLES`。
+- **查询规则**：按 `rule_id` 顺序求值；digest=规范化查询的 MD5；命中 flagOUT 规则停止后续求值；`cache_ttl` 列设缓存毫秒数。
+- **连接流**：Client → ProxySQL(6033) → 查询规则（路由/缓存）→ 主机组 → 后端 MySQL。
+
+## 排障
+
+- **连不上 ProxySQL**：查 `appsettings.json` 连接串、6033 是否在听、radmin/radmin。
+- **SQLite 锁**：查 `APP_DB_PATH` 权限、`/app/db/` 存在可写、Docker 卷挂载。
+- **改动不生效**：配置后没 `LOAD ... TO RUNTIME`；用 Actions 页或直跑 SQL。
+- **认证不工作**：SQLite 库存在且迁移已应用、`Program.cs` 默认用户创建、`DefaultUserSeedService.cs` 日志。
+
+## 依赖与资源
+
+- 关键 NuGet：`Radzen.Blazor`、`MySql.EntityFrameworkCore`、`Microsoft.EntityFrameworkCore.Sqlite`、`Microsoft.AspNetCore.Identity.EntityFrameworkCore`。
+- Dependabot：`.github/dependabot.yml`，周更，目标是 Web 项目的 NuGet。
+- 文档：[ProxySQL](https://proxysql.com/documentation/)、[.NET](https://learn.microsoft.com/en-us/dotnet/)、[Blazor](https://learn.microsoft.com/en-us/aspnet/core/blazor)、[Radzen](https://blazor.radzen.com/)。
+- 版本：.NET 10.0（LTS）、EF Core 8.0.10、Radzen（最新）、ProxySQL 2.7.1、MariaDB 11（后两者 Docker）。
 
 ---
 
-**Last Updated:** 2025-11-04
-**Maintained By:** AI-assisted documentation generation
-
-This document is intended for AI assistants (like Claude Code) to understand the codebase structure, conventions, and development workflows when assisting with development tasks.
+**最后更新**：2025-11-04（AI 辅助生成）。本文档帮助 AI 助手理解代码库结构、约定与开发流程。
